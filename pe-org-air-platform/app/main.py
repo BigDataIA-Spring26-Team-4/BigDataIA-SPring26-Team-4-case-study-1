@@ -3,7 +3,7 @@ from fastapi import FastAPI
 app = FastAPI()
 
 @app.get("/health")
-def read_root():
+def show_health():
     return "NOT_IMPLEMENTED"
 
 @app.post("/api/v1/companies")
