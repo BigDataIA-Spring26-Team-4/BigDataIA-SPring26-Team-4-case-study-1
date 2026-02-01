@@ -12,7 +12,7 @@ app = FastAPI()
 
 
 def get_db():
-    return snowflake.get_db()
+    yield from snowflake.get_db()
 
 
 @app.get("/health")

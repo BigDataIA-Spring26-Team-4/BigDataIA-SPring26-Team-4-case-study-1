@@ -8,7 +8,7 @@ ENV PYTHONDONTWRITEBYTECODE=1
 # the application crashes without emitting any logs due to buffering.
 ENV PYTHONUNBUFFERED=1
 
-WORKDIR /app
+WORKDIR /src
 
 # Create a non-privileged user that the app will run under.
 ARG UID=10001
@@ -26,7 +26,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the source code into the container.
-COPY app/ .
+COPY app/ app/
 
 # Switch to the non-privileged user to run the application.
 USER appuser
@@ -35,4 +35,4 @@ USER appuser
 EXPOSE 8000
 
 # Run the application.
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
