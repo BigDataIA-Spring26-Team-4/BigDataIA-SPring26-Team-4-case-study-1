@@ -1,55 +1,61 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from app.config import settings
+from app.routers import companies, assessments, health
 
-app = FastAPI()
+# Create FastAPI application
+app = FastAPI(
+    title=settings.APP_NAME,
+    version=settings.APP_VERSION,
+    description="AI-Readiness Assessment Platform for Private Equity",
+    docs_url="/docs",
+    redoc_url="/redoc",
+)
 
-@app.get("/health")
-def show_health():
-    return "NOT_IMPLEMENTED"
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Configure based on your needs
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-@app.post("/api/v1/companies")
-def create_company():
-    return "NOT_IMPLEMENTED"
+# Include routers
+app.include_router(
+    health.router,
+    tags=["Health"]
+)
 
-@app.get("/api/v1/companies")
-def list_companies():
-    return "NOT_IMPLEMENTED"
+app.include_router(
+    companies.router,
+    prefix=settings.API_V1_PREFIX,
+    tags=["Companies"]
+)
 
-@app.get("/api/v1/companies/{company_id}")
-def get_company(company_id: str):
-    return "NOT_IMPLEMENTED"
+app.include_router(
+    assessments.router,
+    prefix=settings.API_V1_PREFIX,
+    tags=["Assessments"]
+)
 
-@app.put("/api/v1/companies/{company_id}")
-def update_company(company_id: str):
-    return "NOT_IMPLEMENTED"
 
-@app.delete("/api/v1/companies/{company_id}")
-def delete_company(company_id: str):
-    return "NOT_IMPLEMENTED"
+@app.get("/")
+async def root():
+    """Root endpoint"""
+    return {
+        "message": "PE Org-AI-R Platform API",
+        "version": settings.APP_VERSION,
+        "docs": "/docs",
+        "health": "/health"
+    }
 
-@app.post("/api/v1/assessments")
-def create_assessment():
-    return "NOT_IMPLEMENTED"
 
-@app.get("/api/v1/assessments")
-def list_assessments():
-    return "NOT_IMPLEMENTED"
-
-@app.get("/api/v1/assessments/{assessment_id}")
-def get_assessment(assessment_id: str):
-    return "NOT_IMPLEMENTED"
-
-@app.patch("/api/v1/assessments/{assessment_id}")
-def update_assessment(assessment_id: str):
-    return "NOT_IMPLEMENTED"
-
-@app.post("/api/v1/assessments/{assessment_id}/scores")
-def add_scores(assessment_id: str):
-    return "NOT_IMPLEMENTED"
-
-@app.get("/api/v1/assessments/{assessment_id}/scores")
-def get_scores(assessment_id: str):
-    return "NOT_IMPLEMENTED"
-
-@app.put("/api/v1/assessments/{assessment_id}/scores")
-def update_scores(assessment_id: str):
-    return "NOT_IMPLEMENTED"
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True
+    )
