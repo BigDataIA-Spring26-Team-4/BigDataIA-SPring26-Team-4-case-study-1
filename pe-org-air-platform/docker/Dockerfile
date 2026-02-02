@@ -1,21 +1,16 @@
 ARG PYTHON_VERSION=3.12.3
 FROM python:${PYTHON_VERSION}-slim AS base
 
-# Prevents Python from writing pyc files
+# Prevents Python from writing pyc files.
 ENV PYTHONDONTWRITEBYTECODE=1
 
-# Keeps Python from buffering stdout and stderr
+# Keeps Python from buffering stdout and stderr to avoid situations where
+# the application crashes without emitting any logs due to buffering.
 ENV PYTHONUNBUFFERED=1
 
 WORKDIR /src
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Create a non-privileged user
+# Create a non-privileged user that the app will run under.
 ARG UID=10001
 RUN adduser \
     --disabled-password \
@@ -26,25 +21,18 @@ RUN adduser \
     --uid "${UID}" \
     appuser
 
-# Copy requirements and install dependencies
+# Copy requirements and install dependencies.
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the application code (preserve directory structure)
-COPY app/ ./app/
+# Copy the source code into the container.
+COPY app/ app/
 
-# Change ownership to non-privileged user
-RUN chown -R appuser:appuser /app
-
-# Switch to non-privileged user
+# Switch to the non-privileged user to run the application.
 USER appuser
 
-# Expose the port
+# Expose the port that the application listens on.
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
-
-# Run the application
+# Run the application.
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
