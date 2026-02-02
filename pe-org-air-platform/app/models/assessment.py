@@ -27,7 +27,8 @@ class AssessmentType(str, Enum):
     SCREENING = "screening"
     DUE_DILIGENCE = "due_diligence"
     QUARTERLY = "quarterly"
-    EXIT_PREP = "exit_prep"
+    AD_HOC = "ad_hoc"
+
 
 
 class AssessmentStatus(str, Enum):
