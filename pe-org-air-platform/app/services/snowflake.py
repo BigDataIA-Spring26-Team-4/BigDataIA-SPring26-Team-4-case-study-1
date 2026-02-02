@@ -2,6 +2,7 @@ import os
 import uuid
 from datetime import datetime, date
 
+import structlog
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -15,6 +16,8 @@ from fastapi import HTTPException
 from app.models.company import CompanyCreate, CompanyUpdate
 from app.models.assessment import AssessmentCreate, AssessmentUpdate, VALID_TRANSITIONS, AssessmentStatus
 from app.models.dimension import DimensionScoreCreate, DimensionScoreUpdate
+
+log = structlog.get_logger(__name__)
 
 # ---------------------------------------------------------------------------
 # Engine & session
@@ -40,10 +43,12 @@ Base = declarative_base()
 
 def get_db():
     db = SessionLocal()
+    log.debug("db_session_opened")
     try:
         yield db
     finally:
         db.close()
+        log.debug("db_session_closed")
 
 
 # ---------------------------------------------------------------------------
@@ -98,6 +103,7 @@ class DimensionScoreRow(Base):
 # ---------------------------------------------------------------------------
 
 def create_company(db: Session, data: CompanyCreate) -> CompanyRow:
+    log.info("db_create_company", name=data.name)
     row = CompanyRow(
         name=data.name,
         ticker=data.ticker,
@@ -107,21 +113,26 @@ def create_company(db: Session, data: CompanyCreate) -> CompanyRow:
     db.add(row)
     db.commit()
     db.refresh(row)
+    log.info("db_company_created", company_id=row.id)
     return row
 
 
 def list_companies(db: Session) -> list[CompanyRow]:
+    log.debug("db_list_companies")
     return db.query(CompanyRow).all()
 
 
 def get_company(db: Session, company_id: str) -> CompanyRow:
+    log.debug("db_get_company", company_id=company_id)
     row = db.query(CompanyRow).filter(CompanyRow.id == company_id).first()
     if not row:
+        log.warning("company_not_found", company_id=company_id)
         raise HTTPException(status_code=404, detail="Company not found")
     return row
 
 
 def update_company(db: Session, company_id: str, data: CompanyUpdate) -> CompanyRow:
+    log.info("db_update_company", company_id=company_id)
     row = get_company(db, company_id)
     updates = data.model_dump(exclude_unset=True)
     for field, value in updates.items():
@@ -134,6 +145,7 @@ def update_company(db: Session, company_id: str, data: CompanyUpdate) -> Company
 
 
 def delete_company(db: Session, company_id: str) -> None:
+    log.info("db_delete_company", company_id=company_id)
     row = get_company(db, company_id)
     db.delete(row)
     db.commit()
@@ -144,6 +156,7 @@ def delete_company(db: Session, company_id: str) -> None:
 # ---------------------------------------------------------------------------
 
 def create_assessment(db: Session, data: AssessmentCreate) -> AssessmentRow:
+    log.info("db_create_assessment", company_id=str(data.company_id), type=data.type.value)
     row = AssessmentRow(
         company_id=str(data.company_id),
         type=data.type.value,
@@ -158,21 +171,26 @@ def create_assessment(db: Session, data: AssessmentCreate) -> AssessmentRow:
     db.add(row)
     db.commit()
     db.refresh(row)
+    log.info("db_assessment_created", assessment_id=row.id)
     return row
 
 
 def list_assessments(db: Session) -> list[AssessmentRow]:
+    log.debug("db_list_assessments")
     return db.query(AssessmentRow).all()
 
 
 def get_assessment(db: Session, assessment_id: str) -> AssessmentRow:
+    log.debug("db_get_assessment", assessment_id=assessment_id)
     row = db.query(AssessmentRow).filter(AssessmentRow.id == assessment_id).first()
     if not row:
+        log.warning("assessment_not_found", assessment_id=assessment_id)
         raise HTTPException(status_code=404, detail="Assessment not found")
     return row
 
 
 def update_assessment(db: Session, assessment_id: str, data: AssessmentUpdate) -> AssessmentRow:
+    log.info("db_update_assessment", assessment_id=assessment_id)
     row = get_assessment(db, assessment_id)
     updates = data.model_dump(exclude_unset=True)
 
@@ -181,6 +199,12 @@ def update_assessment(db: Session, assessment_id: str, data: AssessmentUpdate) -
         current = AssessmentStatus(row.status)
         requested = updates["status"]
         if requested not in VALID_TRANSITIONS[current]:
+            log.warning(
+                "invalid_status_transition",
+                assessment_id=assessment_id,
+                current=current.value,
+                requested=requested.value,
+            )
             raise HTTPException(
                 status_code=400,
                 detail=f"Invalid status transition from '{current.value}' to '{requested.value}'",
@@ -205,6 +229,7 @@ def update_assessment(db: Session, assessment_id: str, data: AssessmentUpdate) -
 # ---------------------------------------------------------------------------
 
 def add_scores(db: Session, assessment_id: str, scores: list[DimensionScoreCreate]) -> list[DimensionScoreRow]:
+    log.info("db_add_scores", assessment_id=assessment_id, count=len(scores))
     # Verify assessment exists
     get_assessment(db, assessment_id)
 
@@ -227,13 +252,21 @@ def add_scores(db: Session, assessment_id: str, scores: list[DimensionScoreCreat
 
 
 def get_scores(db: Session, assessment_id: str) -> list[DimensionScoreRow]:
+    log.debug("db_get_scores", assessment_id=assessment_id)
     get_assessment(db, assessment_id)
     return db.query(DimensionScoreRow).filter(DimensionScoreRow.assessment_id == assessment_id).all()
 
 
 def update_scores(db: Session, assessment_id: str, scores: list[DimensionScoreUpdate]) -> list[DimensionScoreRow]:
+    log.info("db_update_scores", assessment_id=assessment_id, count=len(scores))
     existing = get_scores(db, assessment_id)
     if len(scores) != len(existing):
+        log.warning(
+            "score_count_mismatch",
+            assessment_id=assessment_id,
+            expected=len(existing),
+            got=len(scores),
+        )
         raise HTTPException(
             status_code=400,
             detail=f"Expected {len(existing)} scores, got {len(scores)}",

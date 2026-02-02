@@ -3,6 +3,10 @@ import json
 import asyncio
 import functools
 
+import structlog
+
+log = structlog.get_logger(__name__)
+
 _cache: dict[str, any] = {}
 
 
@@ -20,7 +24,9 @@ def cached(prefix: str = ""):
             async def wrapper(*args, **kwargs):
                 key = _make_key(prefix, args, kwargs)
                 if key in _cache:
+                    log.debug("cache_hit", prefix=prefix)
                     return _cache[key]
+                log.debug("cache_miss", prefix=prefix)
                 result = await fn(*args, **kwargs)
                 _cache[key] = result
                 return result
@@ -29,7 +35,9 @@ def cached(prefix: str = ""):
             def wrapper(*args, **kwargs):
                 key = _make_key(prefix, args, kwargs)
                 if key in _cache:
+                    log.debug("cache_hit", prefix=prefix)
                     return _cache[key]
+                log.debug("cache_miss", prefix=prefix)
                 result = fn(*args, **kwargs)
                 _cache[key] = result
                 return result
@@ -42,5 +50,6 @@ def cached(prefix: str = ""):
 def invalidate(prefix: str = ""):
     """Remove all cache entries matching a prefix (or clear everything)."""
     keys = [k for k in _cache if k.startswith(prefix)]
+    log.info("cache_invalidated", prefix=prefix, keys_removed=len(keys))
     for k in keys:
         del _cache[k]
