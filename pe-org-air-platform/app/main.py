@@ -1,81 +1,61 @@
-from fastapi import FastAPI, Depends
-from uuid import UUID
-from sqlalchemy.orm import Session
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from app.config import settings
+from app.routers import companies, assessments, health
 
-from app.models.company import CompanyCreate, CompanyUpdate, CompanyResponse
-from app.models.assessment import AssessmentCreate, AssessmentUpdate, AssessmentResponse
-from app.models.dimension import DimensionScoreCreate, DimensionScoreUpdate, DimensionScoreResponse
-from app.services import snowflake
+# Create FastAPI application
+app = FastAPI(
+    title=settings.APP_NAME,
+    version=settings.APP_VERSION,
+    description="AI-Readiness Assessment Platform for Private Equity",
+    docs_url="/docs",
+    redoc_url="/redoc",
+)
 
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Configure based on your needs
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-app = FastAPI()
+# Include routers
+app.include_router(
+    health.router,
+    tags=["Health"]
+)
 
+app.include_router(
+    companies.router,
+    prefix=settings.API_V1_PREFIX,
+    tags=["Companies"]
+)
 
-def get_db():
-    yield from snowflake.get_db()
-
-
-@app.get("/health")
-def show_health() -> dict:
-    return {"status": "ok"}
-
-
-@app.post("/api/v1/companies", response_model=CompanyResponse)
-def create_company(company: CompanyCreate, db: Session = Depends(get_db)):
-    return snowflake.create_company(db, company)
-
-
-@app.get("/api/v1/companies", response_model=list[CompanyResponse])
-def list_companies(db: Session = Depends(get_db)):
-    return snowflake.list_companies(db)
-
-
-@app.get("/api/v1/companies/{company_id}", response_model=CompanyResponse)
-def get_company(company_id: UUID, db: Session = Depends(get_db)):
-    return snowflake.get_company(db, str(company_id))
-
-
-@app.put("/api/v1/companies/{company_id}", response_model=CompanyResponse)
-def update_company(company_id: UUID, company: CompanyUpdate, db: Session = Depends(get_db)):
-    return snowflake.update_company(db, str(company_id), company)
-
-
-@app.delete("/api/v1/companies/{company_id}")
-def delete_company(company_id: UUID, db: Session = Depends(get_db)):
-    snowflake.delete_company(db, str(company_id))
-    return {"detail": "deleted"}
+app.include_router(
+    assessments.router,
+    prefix=settings.API_V1_PREFIX,
+    tags=["Assessments"]
+)
 
 
-@app.post("/api/v1/assessments", response_model=AssessmentResponse)
-def create_assessment(assessment: AssessmentCreate, db: Session = Depends(get_db)):
-    return snowflake.create_assessment(db, assessment)
+@app.get("/")
+async def root():
+    """Root endpoint"""
+    return {
+        "message": "PE Org-AI-R Platform API",
+        "version": settings.APP_VERSION,
+        "docs": "/docs",
+        "health": "/health"
+    }
 
 
-@app.get("/api/v1/assessments", response_model=list[AssessmentResponse])
-def list_assessments(db: Session = Depends(get_db)):
-    return snowflake.list_assessments(db)
-
-
-@app.get("/api/v1/assessments/{assessment_id}", response_model=AssessmentResponse)
-def get_assessment(assessment_id: UUID, db: Session = Depends(get_db)):
-    return snowflake.get_assessment(db, str(assessment_id))
-
-
-@app.patch("/api/v1/assessments/{assessment_id}", response_model=AssessmentResponse)
-def update_assessment(assessment_id: UUID, assessment: AssessmentUpdate, db: Session = Depends(get_db)):
-    return snowflake.update_assessment(db, str(assessment_id), assessment)
-
-
-@app.post("/api/v1/assessments/{assessment_id}/scores", response_model=list[DimensionScoreResponse])
-def add_scores(assessment_id: UUID, scores: list[DimensionScoreCreate], db: Session = Depends(get_db)):
-    return snowflake.add_scores(db, str(assessment_id), scores)
-
-
-@app.get("/api/v1/assessments/{assessment_id}/scores", response_model=list[DimensionScoreResponse])
-def get_scores(assessment_id: UUID, db: Session = Depends(get_db)):
-    return snowflake.get_scores(db, str(assessment_id))
-
-
-@app.put("/api/v1/assessments/{assessment_id}/scores", response_model=list[DimensionScoreResponse])
-def update_scores(assessment_id: UUID, scores: list[DimensionScoreUpdate], db: Session = Depends(get_db)):
-    return snowflake.update_scores(db, str(assessment_id), scores)
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True
+    )
