@@ -1,37 +1,21 @@
-# Core Framework
-fastapi==0.115.5
-uvicorn[standard]==0.34.0
-pydantic==2.10.3
-pydantic-settings==2.6.1
-
-# Database
+annotated-doc==0.0.4
+annotated-types==0.7.0
+anyio==4.12.1
+click==8.3.1
+fastapi==0.128.0
+greenlet==3.3.1
+h11==0.16.0
+idna==3.11
+packaging==26.0
+pydantic==2.12.5
+pydantic_core==2.41.5
+python-dotenv==1.1.0
 snowflake-sqlalchemy==1.7.3
-snowflake-connector-python==3.12.3
-SQLAlchemy==2.0.36
-
-# Caching
-redis==5.2.1
-
-# AWS / Cloud Storage
-boto3==1.35.78
-botocore==1.35.78
-
-# Environment & Configuration
-python-dotenv==1.0.1
-
-# Logging
+SQLAlchemy==2.0.46
+starlette==0.50.0
 structlog==24.4.0
-
-# HTTP Client
+typing-inspection==0.4.2
+typing_extensions==4.15.0
+uvicorn==0.40.0
 httpx==0.28.1
-
-# Testing
 pytest==8.3.5
-pytest-asyncio==0.24.0
-pytest-cov==6.0.0
-
-# Type Checking & Validation
-typing-extensions==4.12.2
-
-# Utilities
-python-multipart==0.0.20
