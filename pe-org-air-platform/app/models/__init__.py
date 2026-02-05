@@ -26,6 +26,11 @@ from app.models.assessment import (
     get_allowed_transitions,
 )
 
+from app.models.common import (
+    PaginatedResponse,
+    paginate,
+)
+
 from app.models.dimension import (
     Dimension,
     DimensionScoreBase,
@@ -41,6 +46,10 @@ from app.models.dimension import (
 )
 
 __all__ = [
+    # Common models
+    "PaginatedResponse",
+    "paginate",
+    
     # Company models
     "CompanyBase",
     "CompanyCreate",

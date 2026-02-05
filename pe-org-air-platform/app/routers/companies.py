@@ -1,9 +1,17 @@
+"""
+Companies API router for PE Org-AI-R Platform.
+
+Implements all company endpoints with PDF-compliant pagination.
+"""
+
 import structlog
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from uuid import UUID
+from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.models.company import CompanyCreate, CompanyUpdate, CompanyResponse
+from app.models.common import PaginatedResponse, paginate
 from app.services import snowflake
 from app.services.snowflake import get_db
 from app.services.redis_cache import cached, invalidate
@@ -14,8 +22,9 @@ router = APIRouter(prefix="/api/v1/companies", tags=["companies"])
 CACHE_PREFIX = "companies:"
 
 
-@router.post("", response_model=CompanyResponse)
+@router.post("", response_model=CompanyResponse, status_code=201)
 def create_company(company: CompanyCreate, db: Session = Depends(get_db)):
+    """Create a new company."""
     log.info("creating_company", name=company.name)
     result = snowflake.create_company(db, company)
     invalidate(CACHE_PREFIX)
@@ -23,22 +32,54 @@ def create_company(company: CompanyCreate, db: Session = Depends(get_db)):
     return result
 
 
-@router.get("", response_model=list[CompanyResponse])
-@cached(prefix=CACHE_PREFIX)
-def list_companies(db: Session = Depends(get_db)):
-    log.info("listing_companies")
-    return snowflake.list_companies(db)
+@router.get("", response_model=PaginatedResponse[CompanyResponse])
+def list_companies(
+    page: int = Query(1, ge=1, description="Page number (1-indexed)"),
+    page_size: int = Query(20, ge=1, le=100, description="Items per page"),
+    industry_id: Optional[str] = Query(None, description="Filter by industry ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    List companies with pagination.
+    
+    Returns paginated response per PDF Section 4.3:
+    {
+        "items": [...],
+        "total": 100,
+        "page": 1,
+        "page_size": 20,
+        "total_pages": 5
+    }
+    """
+    # Convert page/page_size to skip/limit
+    skip = (page - 1) * page_size
+    limit = page_size
+    
+    log.info("listing_companies", page=page, page_size=page_size, industry_id=industry_id)
+    
+    # Get items and total count
+    items = snowflake.list_companies(db, skip=skip, limit=limit, industry_id=industry_id)
+    total = snowflake.count_companies(db, industry_id=industry_id)
+    
+    # Return paginated response
+    return paginate(items, total, skip, limit)
 
 
 @router.get("/{company_id}", response_model=CompanyResponse)
 @cached(prefix=CACHE_PREFIX)
 def get_company(company_id: UUID, db: Session = Depends(get_db)):
+    """Get a company by ID."""
     log.info("getting_company", company_id=str(company_id))
     return snowflake.get_company(db, str(company_id))
 
 
 @router.put("/{company_id}", response_model=CompanyResponse)
-def update_company(company_id: UUID, company: CompanyUpdate, db: Session = Depends(get_db)):
+def update_company(
+    company_id: UUID,
+    company: CompanyUpdate,
+    db: Session = Depends(get_db)
+):
+    """Update a company."""
     log.info("updating_company", company_id=str(company_id))
     result = snowflake.update_company(db, str(company_id), company)
     invalidate(CACHE_PREFIX)
@@ -46,10 +87,11 @@ def update_company(company_id: UUID, company: CompanyUpdate, db: Session = Depen
     return result
 
 
-@router.delete("/{company_id}")
+@router.delete("/{company_id}", status_code=204)
 def delete_company(company_id: UUID, db: Session = Depends(get_db)):
+    """Soft delete a company."""
     log.info("deleting_company", company_id=str(company_id))
     snowflake.delete_company(db, str(company_id))
     invalidate(CACHE_PREFIX)
     log.info("company_deleted", company_id=str(company_id))
-    return {"detail": "deleted"}
+    return None

@@ -1,37 +1,165 @@
+"""
+Main FastAPI application for PE Org-AI-R Platform.
+"""
+
 from contextlib import asynccontextmanager
 
 import structlog
 from fastapi import FastAPI, Request, Response
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.config import settings
 from app.logging import setup_logging
 from app.routers import health, companies, assessments
 
+# Setup logging
 setup_logging()
 log = structlog.get_logger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    log.info("application_startup")
+    """
+    Application lifespan events.
+    Handles startup and shutdown tasks.
+    """
+    # Startup
+    log.info(
+        "application_startup",
+        app_name=settings.APP_NAME,
+        version=settings.APP_VERSION,
+        debug=settings.DEBUG
+    )
+    
+    # Log configuration (without sensitive data)
+    log.info(
+        "configuration_loaded",
+        snowflake_account=settings.SNOWFLAKE_ACCOUNT,
+        snowflake_database=settings.SNOWFLAKE_DATABASE,
+        redis_enabled=settings.REDIS_ENABLED,
+        s3_enabled=settings.S3_ENABLED,
+    )
+    
     yield
+    
+    # Shutdown
     log.info("application_shutdown")
 
 
-app = FastAPI(lifespan=lifespan)
+# Create FastAPI app
+app = FastAPI(
+    title=settings.APP_NAME,
+    version=settings.APP_VERSION,
+    description="AI-Readiness Assessment Platform for Private Equity Portfolio Companies",
+    lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json"
+)
 
-app.include_router(health.router)
-app.include_router(companies.router)
-app.include_router(assessments.router)
 
+# ============================================================================
+# Exception Handlers
+# ============================================================================
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Handle Pydantic validation errors."""
+    log.warning(
+        "validation_error",
+        path=request.url.path,
+        errors=exc.errors()
+    )
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": exc.errors(),
+            "message": "Validation error"
+        }
+    )
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """Handle HTTP exceptions."""
+    log.warning(
+        "http_error",
+        path=request.url.path,
+        status_code=exc.status_code,
+        detail=exc.detail
+    )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail}
+    )
+
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    """Handle unexpected errors."""
+    log.error(
+        "unhandled_error",
+        path=request.url.path,
+        error=str(exc),
+        exc_info=True
+    )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"}
+    )
+
+
+# ============================================================================
+# Middleware
+# ============================================================================
 
 @app.middleware("http")
 async def logging_middleware(request: Request, call_next):
-    log.info("request_started", method=request.method, path=request.url.path)
+    """Log all requests and responses."""
+    log.info(
+        "request_started",
+        method=request.method,
+        path=request.url.path,
+        query_params=dict(request.query_params)
+    )
+    
     response: Response = await call_next(request)
+    
     log.info(
         "request_finished",
         method=request.method,
         path=request.url.path,
-        status_code=response.status_code,
+        status_code=response.status_code
     )
+    
     return response
+
+
+# ============================================================================
+# Routers
+# ============================================================================
+
+# Health check (no prefix)
+app.include_router(health.router)
+
+# API v1 routers
+app.include_router(companies.router)
+app.include_router(assessments.router)
+
+
+# ============================================================================
+# Root endpoint
+# ============================================================================
+
+@app.get("/", tags=["root"])
+async def root():
+    """Root endpoint with API information."""
+    return {
+        "name": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "status": "running",
+        "docs": "/docs",
+        "health": "/health"
+    }

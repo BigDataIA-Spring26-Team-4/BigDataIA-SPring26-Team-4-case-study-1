@@ -186,23 +186,6 @@ class Settings(BaseSettings):
     # ========================================================================
     
     @property
-    def snowflake_connection_string(self) -> str:
-        """
-        Generate Snowflake SQLAlchemy connection string.
-        
-        Returns:
-            str: SQLAlchemy connection URL for Snowflake
-        """
-        url = (
-            f"snowflake://{self.SNOWFLAKE_USER}:{self.SNOWFLAKE_PASSWORD}"
-            f"@{self.SNOWFLAKE_ACCOUNT}/{self.SNOWFLAKE_DATABASE}/{self.SNOWFLAKE_SCHEMA}"
-            f"?warehouse={self.SNOWFLAKE_WAREHOUSE}"
-        )
-        if self.SNOWFLAKE_ROLE:
-            url += f"&role={self.SNOWFLAKE_ROLE}"
-        return url
-    
-    @property
     def redis_connection_string(self) -> str:
         """
         Generate Redis connection string.
