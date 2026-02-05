@@ -23,9 +23,9 @@ copy .env.example .env
 
 **Edit `.env` with your Snowflake credentials:**
 ```env
-SNOWFLAKE_ACCOUNT=FMPWLZC-WDC54141
-SNOWFLAKE_USER=deep25lelouch
-SNOWFLAKE_PASSWORD=Deep@2505200310
+SNOWFLAKE_ACCOUNT=
+SNOWFLAKE_USER=
+SNOWFLAKE_PASSWORD=
 ```
 
 ---
