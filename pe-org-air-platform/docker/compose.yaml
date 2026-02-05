@@ -1,5 +1,4 @@
 # Docker Compose for PE Org-AI-R Platform
-version: '3.8'
 
 services:
   # FastAPI Application
