@@ -1,38 +1,61 @@
-ARG PYTHON_VERSION=3.12.3
-FROM python:${PYTHON_VERSION}-slim AS base
+# Multi-stage Dockerfile for PE Org-AI-R Platform
+FROM python:3.11-slim as base
 
-# Prevents Python from writing pyc files.
-ENV PYTHONDONTWRITEBYTECODE=1
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Keeps Python from buffering stdout and stderr to avoid situations where
-# the application crashes without emitting any logs due to buffering.
-ENV PYTHONUNBUFFERED=1
+WORKDIR /app
 
-WORKDIR /src
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
 
-# Create a non-privileged user that the app will run under.
-ARG UID=10001
-RUN adduser \
-    --disabled-password \
-    --gecos "" \
-    --home "/nonexistent" \
-    --shell "/sbin/nologin" \
-    --no-create-home \
-    --uid "${UID}" \
-    appuser
+# ============================================================================
+# Builder stage - Install Python dependencies
+# ============================================================================
+FROM base as builder
 
-# Copy requirements and install dependencies.
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy only dependency files first (for layer caching)
+COPY pyproject.toml poetry.lock* ./
 
-# Copy the source code into the container.
-COPY app/ app/
+# Install Poetry
+RUN pip install poetry==1.7.1
 
-# Switch to the non-privileged user to run the application.
+# Export dependencies to requirements.txt
+RUN poetry export -f requirements.txt --output requirements.txt --without-hashes
+
+# Install dependencies
+RUN pip install -r requirements.txt
+
+# ============================================================================
+# Runtime stage
+# ============================================================================
+FROM base as runtime
+
+# Copy Python dependencies from builder (now in /usr/local)
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Copy application code
+COPY app/ /app/app/
+
+# Create non-root user
+RUN useradd -m -u 1000 appuser && \
+    chown -R appuser:appuser /app
+
+# Switch to non-root user
 USER appuser
 
-# Expose the port that the application listens on.
+# Expose port
 EXPOSE 8000
 
-# Run the application.
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import requests; requests.get('http://localhost:8000/health').raise_for_status()" || exit 1
+
+# Run application
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
