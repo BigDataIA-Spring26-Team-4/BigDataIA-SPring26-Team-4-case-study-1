@@ -37,6 +37,7 @@ The PE Org-AI-R (Organizational AI-Readiness) platform enables private equity fi
 ```
 
 ### **Components:**
+
 - **FastAPI**: REST API with OpenAPI documentation
 - **Pydantic**: Data validation and serialization
 - **Snowflake**: Primary database (cloud data warehouse)
@@ -92,6 +93,7 @@ cp .env.example .env    # Linux/Mac
 ```
 
 **Example .env configuration:**
+
 ```env
 SNOWFLAKE_ACCOUNT=your-account-identifier
 SNOWFLAKE_USER=your-username
@@ -120,11 +122,13 @@ python scripts/create_test_data.py
 #### 5. Run Application
 
 **Option A: Local Development (with hot reload)**
+
 ```bash
 uvicorn app.main:app --reload
 ```
 
 **Option B: Docker Deployment**
+
 ```bash
 cd docker
 copy .env.example .env  # Edit with your credentials
@@ -142,9 +146,11 @@ docker-compose up --build
 ## 📊 API Endpoints
 
 ### Health Check
+
 - `GET /health` - Check system health and dependencies
 
 ### Companies
+
 - `POST /api/v1/companies` - Create new company
 - `GET /api/v1/companies` - List companies (paginated)
 - `GET /api/v1/companies/{id}` - Get company by ID
@@ -152,12 +158,14 @@ docker-compose up --build
 - `DELETE /api/v1/companies/{id}` - Soft delete company
 
 ### Assessments
+
 - `POST /api/v1/assessments` - Create new assessment
 - `GET /api/v1/assessments` - List assessments (paginated, filterable)
 - `GET /api/v1/assessments/{id}` - Get assessment by ID
 - `PATCH /api/v1/assessments/{id}` - Update assessment (including status)
 
 ### Dimension Scores
+
 - `POST /api/v1/assessments/{id}/scores` - Add dimension scores
 - `GET /api/v1/assessments/{id}/scores` - Get all scores for assessment
 - `PUT /api/v1/scores/{id}` - Update single dimension score
@@ -217,6 +225,7 @@ poetry run pytest tests/test_api.py -v
 3. Follow test scenarios:
 
 **Scenario 1: Create and Retrieve Company**
+
 ```json
 POST /api/v1/companies
 {
@@ -228,6 +237,7 @@ POST /api/v1/companies
 ```
 
 **Scenario 2: Create Assessment**
+
 ```json
 POST /api/v1/assessments
 {
@@ -239,6 +249,7 @@ POST /api/v1/assessments
 ```
 
 **Scenario 3: Add Dimension Scores**
+
 ```json
 POST /api/v1/assessments/{assessment_id}/scores
 [
@@ -350,6 +361,7 @@ pe-org-air-platform/
 All configuration is managed through environment variables using `pydantic-settings`.
 
 **Required Variables:**
+
 ```env
 # Snowflake Database
 SNOWFLAKE_ACCOUNT=        # Your Snowflake account identifier
@@ -361,6 +373,7 @@ SNOWFLAKE_WAREHOUSE=      # Warehouse name (default: PE_ORG_AIR_WH)
 ```
 
 **Optional Variables:**
+
 ```env
 # Redis Cache
 REDIS_HOST=localhost      # Redis host (use 'redis' for Docker)
@@ -385,23 +398,28 @@ DEBUG=false               # Debug mode
 ### Tables (Snowflake)
 
 **industries** - Industry reference data
+
 - 5 seed industries: Manufacturing, Healthcare, Business Services, Retail, Financial Services
 
 **companies** - Portfolio companies
+
 - Fields: name, ticker, industry_id, position_factor, is_deleted
 - Supports soft delete
 
 **assessments** - AI-readiness assessments
+
 - Fields: company_id, assessment_type, status, primary_assessor, v_r_score
 - State machine for status transitions
 
 **dimension_scores** - Individual dimension scores
+
 - Fields: assessment_id, dimension, score, weight, confidence, evidence_count
 - Unique constraint on (assessment_id, dimension)
 
 ### Data Validation
 
 **Note:** The PDF specification includes CHECK constraints, but Snowflake does not support them on regular tables. All data validation is handled by Pydantic models in the application layer, which provides:
+
 - ✅ Type safety
 - ✅ Range validation (e.g., scores 0-100)
 - ✅ Enum validation
@@ -416,14 +434,15 @@ This is the recommended approach for Snowflake applications.
 
 Redis caching is implemented for frequently accessed data:
 
-| Data Type | TTL | Rationale |
-|-----------|-----|-----------|
-| Company by ID | 5 minutes | Frequently accessed, rarely changes |
-| Industry list | 1 hour | Static reference data |
-| Assessment by ID | 2 minutes | May be updated during work |
-| Dimension weights | 24 hours | Configuration data |
+| Data Type         | TTL       | Rationale                           |
+| ----------------- | --------- | ----------------------------------- |
+| Company by ID     | 5 minutes | Frequently accessed, rarely changes |
+| Industry list     | 1 hour    | Static reference data               |
+| Assessment by ID  | 2 minutes | May be updated during work          |
+| Dimension weights | 24 hours  | Configuration data                  |
 
 **Cache Invalidation:**
+
 - Automatic on CREATE, UPDATE, DELETE operations
 - Pattern-based invalidation (e.g., `companies:*`)
 
@@ -432,36 +451,43 @@ Redis caching is implemented for frequently accessed data:
 ## 🎨 Design Decisions
 
 ### 1. **Poetry vs requirements.txt**
+
 - **Decision**: Use Poetry for dependency management
 - **Rationale**: Better dependency resolution, lock files, dev dependencies separation
 - **Trade-off**: requirements.txt exported for Docker compatibility
 
 ### 2. **Plural Table Names**
+
 - **Decision**: Use plural names (industries, companies, assessments, dimension_scores)
 - **Rationale**: Follows PDF specification and REST conventions
 - **Consistency**: Matches endpoint naming (/companies, /assessments)
 
 ### 3. **Pydantic Validation vs Database Constraints**
+
 - **Decision**: Validation in Pydantic models, not database CHECK constraints
 - **Rationale**: Snowflake doesn't support CHECK constraints; application-level validation provides better error messages
 - **Benefit**: Type-safe validation before database interaction
 
 ### 4. **State Machine for Assessment Status**
+
 - **Decision**: Explicit state transition validation
 - **Rationale**: Prevents invalid status changes (e.g., APPROVED → DRAFT)
 - **Implementation**: `validate_status_transition()` function
 
 ### 5. **Soft Delete for Companies**
+
 - **Decision**: is_deleted flag instead of hard delete
 - **Rationale**: Preserves referential integrity, enables audit trail
 - **Impact**: Queries filter by is_deleted=FALSE
 
 ### 6. **Pagination Format**
+
 - **Decision**: PaginatedResponse wrapper with metadata
 - **Rationale**: PDF specification (Section 4.3)
 - **Response**: `{items: [...], total: N, page: X, page_size: Y, total_pages: Z}`
 
 ### 7. **Multi-stage Docker Build**
+
 - **Decision**: Separate builder and runtime stages
 - **Rationale**: Smaller final image (~200MB vs ~500MB)
 - **Process**: Poetry → requirements.txt → pip install
@@ -471,22 +497,26 @@ Redis caching is implemented for frequently accessed data:
 ## 🔍 Known Limitations
 
 ### 1. **Snowflake Features Not Used**
+
 - **Indexes**: Not supported on regular tables (uses micro-partitions instead)
 - **CHECK Constraints**: Not supported (validation in Pydantic)
 - **Impact**: None - Snowflake automatically optimizes queries
 
 ### 2. **S3 Storage**
+
 - **Status**: Implemented but disabled (S3_ENABLED=false)
 - **Reason**: Not required for Case Study 1
 - **Future**: Will be enabled in Case Study 2 for document storage
 
 ### 3. **Assessment Date Field**
+
 - **PDF Spec**: DATE type
 - **Pydantic Model**: datetime (for flexibility)
 - **Database**: DATE (stored as date only)
 - **Conversion**: Automatic in service layer
 
 ### 4. **Cache Consistency**
+
 - **Pattern**: Write-through cache with TTL
 - **Limitation**: No distributed cache invalidation
 - **Acceptable**: For current scale and use case
@@ -534,16 +564,19 @@ poetry run pytest tests/test_api.py -v
 ## 📈 Performance Considerations
 
 ### Database Optimization
+
 - **Connection pooling**: Enabled via SQLAlchemy
 - **Lazy loading**: Queries only fetch required fields
 - **Pagination**: Limit query results (max 100 per page)
 
 ### Caching Strategy
+
 - **Redis**: In-memory cache for frequently accessed data
 - **TTL-based expiration**: Automatic cleanup
 - **Pattern-based invalidation**: Clear related cache on updates
 
 ### API Performance
+
 - **Async health checks**: Non-blocking dependency checks
 - **Middleware logging**: Structured logs for monitoring
 - **Exception handling**: Graceful error responses
@@ -553,16 +586,19 @@ poetry run pytest tests/test_api.py -v
 ## 🔐 Security Considerations
 
 ### Environment Variables
+
 - Sensitive credentials in .env (not committed to Git)
 - URL encoding for special characters in passwords
 - .env.example provided as template
 
 ### Docker Security
+
 - Non-root user (appuser) in container
 - Minimal base image (python:3.11-slim)
 - Multi-stage build (no build tools in runtime)
 
 ### API Security
+
 - Input validation via Pydantic (prevents SQL injection)
 - State machine prevents invalid status transitions
 - Soft delete preserves data integrity
@@ -600,6 +636,7 @@ curl http://localhost:8000/health
 ### Scaling Considerations
 
 For production scaling:
+
 - Use multiple API containers (horizontal scaling)
 - Configure Snowflake warehouse size based on load
 - Use Redis Cluster for distributed caching
@@ -676,10 +713,12 @@ API endpoints return paginated responses per PDF specification:
 ```
 
 **Query parameters:**
+
 - `page` (default: 1, min: 1)
 - `page_size` (default: 20, min: 1, max: 100)
 
 **Example:**
+
 ```
 GET /api/v1/companies?page=2&page_size=10
 ```
@@ -691,27 +730,32 @@ GET /api/v1/companies?page=2&page_size=10
 Based on PDF Section 8.1:
 
 ### Data Models (25 points) ✅
+
 - [x] All Pydantic models implemented (Company, Assessment, DimensionScore, Industry)
 - [x] Proper validation rules (field constraints, type checking)
 - [x] Enum types for AssessmentType, AssessmentStatus, Dimension
 
 ### API Endpoints (30 points) ✅
+
 - [x] All 12 REST endpoints functional
 - [x] Health check returns dependency status
 - [x] Pagination on list endpoints
 - [x] Proper error handling with meaningful messages
 
 ### Data Persistence (20 points) ✅
+
 - [x] Snowflake schema created with all tables
 - [x] Redis caching implemented for companies and industries
 - [x] CRUD operations working end-to-end
 
 ### Infrastructure (15 points) ✅
+
 - [x] Docker builds and runs successfully
 - [x] docker-compose orchestrates all services
 - [x] Environment configuration via .env files
 
 ### Quality & Documentation (10 points) ✅
+
 - [x] Tests implemented (test_models.py, test_api.py)
 - [x] README with setup instructions
 - [x] API documentation via OpenAPI/Swagger
@@ -723,6 +767,7 @@ Based on PDF Section 8.1:
 ## 📚 Resources
 
 ### Documentation
+
 - **FastAPI**: https://fastapi.tiangolo.com
 - **Pydantic**: https://docs.pydantic.dev/latest/
 - **Snowflake Python**: https://docs.snowflake.com/en/developer-guide/python-connector
@@ -731,6 +776,7 @@ Based on PDF Section 8.1:
 - **Docker**: https://docs.docker.com/
 
 ### Course Materials
+
 - **Case Study PDF**: PE_OrgAIR_CaseStudy1_Platform_Foundation.pdf
 - **Lab Recordings**: Available on course LMS
 
@@ -741,6 +787,7 @@ Based on PDF Section 8.1:
 This is individual coursework. See PDF Section 9.3 for academic integrity guidelines.
 
 ### Development Guidelines
+
 - Follow PEP 8 style guide
 - Use type hints
 - Write docstrings for all functions
@@ -767,6 +814,7 @@ Spring 2026
 ## 🎯 Looking Ahead
 
 This platform foundation serves as the base for future case studies:
+
 - **Case Study 2**: SEC document ingestion and evidence extraction
 - **Case Study 3**: AI-readiness scoring engine
 - **Case Study 4**: RAG and semantic search
@@ -777,6 +825,7 @@ This platform foundation serves as the base for future case studies:
 ## 🆘 Troubleshooting
 
 ### Snowflake Connection Issues
+
 ```bash
 # Verify connection
 python scripts/test_connection.py
@@ -788,6 +837,7 @@ python scripts/test_connection.py
 ```
 
 ### Redis Connection Issues
+
 ```bash
 # Check if Redis is running
 docker ps | grep redis
@@ -797,6 +847,7 @@ docker run -d --name redis -p 6379:6379 redis:7-alpine
 ```
 
 ### Docker Build Issues
+
 ```bash
 # Clean rebuild
 docker-compose down
@@ -806,6 +857,7 @@ docker-compose up
 ```
 
 ### Import Errors
+
 ```bash
 # Reinstall dependencies
 poetry install

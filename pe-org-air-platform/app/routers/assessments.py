@@ -116,15 +116,5 @@ def get_scores(assessment_id: UUID, db: Session = Depends(get_db)):
     return snowflake.get_scores(db, str(assessment_id))
 
 
-@router.put("/scores/{score_id}", response_model=DimensionScoreResponse)
-def update_score(
-    score_id: UUID,
-    score: DimensionScoreUpdate,
-    db: Session = Depends(get_db)
-):
-    """Update a single dimension score."""
-    log.info("updating_score", score_id=str(score_id))
-    result = snowflake.update_score(db, str(score_id), score)
-    invalidate(CACHE_PREFIX)
-    log.info("score_updated", score_id=str(score_id))
-    return result
+# Note: Individual score update endpoint moved to app/routers/scores.py
+# to match PDF Table 2 endpoint: PUT /api/v1/scores/{id}
