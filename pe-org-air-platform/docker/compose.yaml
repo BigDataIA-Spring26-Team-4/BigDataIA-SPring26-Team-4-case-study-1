@@ -10,7 +10,8 @@
 services:
   server:
     build:
-      context: .
+      context: ..
+      dockerfile: docker/Dockerfile
     ports:
       - 8000:8000
 
