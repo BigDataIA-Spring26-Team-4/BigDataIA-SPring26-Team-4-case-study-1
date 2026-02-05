@@ -2,3 +2,4 @@
 .gitignore
 .venv
 pe-org-air-platform/.env
+pe-org-air-platform/docker/.env
