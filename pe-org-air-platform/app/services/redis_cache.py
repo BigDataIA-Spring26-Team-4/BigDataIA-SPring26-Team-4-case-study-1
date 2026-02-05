@@ -219,7 +219,11 @@ def cached(prefix: str, ttl: Optional[int] = None):
             # Generate cache key from function arguments
             # Skip first arg if it's 'db' (database session)
             cache_args = args[1:] if args and hasattr(args[0], 'query') else args
-            key = cache_key(prefix, *cache_args, **kwargs)
+            
+            # Remove 'db' from kwargs if present (from Depends(get_db))
+            cache_kwargs = {k: v for k, v in kwargs.items() if k != 'db'}
+            
+            key = cache_key(prefix, *cache_args, **cache_kwargs)
             
             # Try to get from cache
             client = get_redis_client()
@@ -227,14 +231,14 @@ def cached(prefix: str, ttl: Optional[int] = None):
                 try:
                     cached_data = client.get(key)
                     if cached_data:
-                        log.debug("cache_hit", key=key, function=func.__name__)
+                        log.info("cache_hit", key=key, function=func.__name__)  # Changed to info to see it
                         # Return raw data (will be serialized by FastAPI)
                         return json.loads(cached_data)
                 except Exception as e:
                     log.warning("cache_error", error=str(e))
             
             # Cache miss - execute function
-            log.debug("cache_miss", key=key, function=func.__name__)
+            log.info("cache_miss", key=key, function=func.__name__)  # Changed to info to see it
             result = func(*args, **kwargs)
             
             # Cache the result
@@ -243,24 +247,36 @@ def cached(prefix: str, ttl: Optional[int] = None):
                     # Determine TTL
                     cache_ttl = ttl or settings.CACHE_TTL_COMPANY
                     
+                    # Helper function to convert SQLAlchemy models to dict
+                    def to_dict(obj):
+                        # Check if it's a SQLAlchemy model (has __table__ attribute)
+                        if hasattr(obj, '__table__'):
+                            # Convert SQLAlchemy model to dict
+                            return {c.name: getattr(obj, c.name) for c in obj.__table__.columns}
+                        # Check if it's a Pydantic model
+                        elif hasattr(obj, 'model_dump'):
+                            return obj.model_dump()
+                        else:
+                            return obj
+                    
                     # Serialize result
                     if isinstance(result, list):
-                        # List of Pydantic models
-                        serialized = json.dumps([
-                            item.model_dump() if hasattr(item, 'model_dump') else item
-                            for item in result
-                        ])
+                        # List of models (Pydantic or SQLAlchemy)
+                        serialized = json.dumps([to_dict(item) for item in result], default=str)
                     elif hasattr(result, 'model_dump'):
                         # Single Pydantic model
                         serialized = result.model_dump_json()
+                    elif hasattr(result, '__table__'):
+                        # Single SQLAlchemy model
+                        serialized = json.dumps(to_dict(result), default=str)
                     else:
                         # Raw data
-                        serialized = json.dumps(result)
+                        serialized = json.dumps(result, default=str)
                     
                     client.setex(key, cache_ttl, serialized)
-                    log.debug("cache_stored", key=key, ttl=cache_ttl)
+                    log.info("cache_stored", key=key, ttl=cache_ttl)  # Changed to info to see it
                 except Exception as e:
-                    log.warning("cache_store_error", error=str(e))
+                    log.warning("cache_store_error", error=str(e), key=key)
             
             return result
         

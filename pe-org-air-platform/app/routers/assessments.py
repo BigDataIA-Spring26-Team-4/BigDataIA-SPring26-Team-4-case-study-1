@@ -64,9 +64,9 @@ def list_assessments(
 
 
 @router.get("/{assessment_id}", response_model=AssessmentResponse)
-@cached(prefix=CACHE_PREFIX)
+@cached(prefix=CACHE_PREFIX, ttl=120)  # 2 minutes per PDF Table 3
 def get_assessment(assessment_id: UUID, db: Session = Depends(get_db)):
-    """Get an assessment by ID."""
+    """Get an assessment by ID (cached for 2 minutes per PDF Table 3)."""
     log.info("getting_assessment", assessment_id=str(assessment_id))
     return snowflake.get_assessment(db, str(assessment_id))
 

@@ -66,9 +66,9 @@ def list_companies(
 
 
 @router.get("/{company_id}", response_model=CompanyResponse)
-@cached(prefix=CACHE_PREFIX)
+@cached(prefix=CACHE_PREFIX, ttl=300)  # 5 minutes per PDF Table 3
 def get_company(company_id: UUID, db: Session = Depends(get_db)):
-    """Get a company by ID."""
+    """Get a company by ID (cached for 5 minutes per PDF Table 3)."""
     log.info("getting_company", company_id=str(company_id))
     return snowflake.get_company(db, str(company_id))
 

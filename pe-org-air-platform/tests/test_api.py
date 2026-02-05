@@ -505,6 +505,127 @@ class TestPagination:
 
 
 # ===========================================================================
+# Industries Endpoints Tests
+# ===========================================================================
+
+INDUSTRIES_URL = "/api/v1/industries"
+
+
+def _industry_row(**overrides):
+    """Create mock industry row."""
+    defaults = dict(
+        id=FAKE_INDUSTRY_ID,
+        name="Manufacturing",
+        sector="Industrials",
+        h_r_base=72.0,
+        created_at=NOW,
+    )
+    defaults.update(overrides)
+    row = MagicMock()
+    row.configure_mock(**defaults)
+    return row
+
+
+class TestListIndustries:
+    """Test industries list endpoint (cached 1 hour)."""
+    
+    @patch("app.routers.industries.snowflake")
+    def test_success(self, mock_sf, client):
+        """Test listing industries with caching."""
+        mock_sf.list_industries.return_value = [
+            _industry_row(),
+            _industry_row(id=str(uuid.uuid4()), name="Healthcare"),
+        ]
+        resp = client.get(INDUSTRIES_URL)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body) == 2
+        assert body[0]["name"] == "Manufacturing"
+    
+    @patch("app.routers.industries.snowflake")
+    def test_empty(self, mock_sf, client):
+        """Test empty industries list."""
+        mock_sf.list_industries.return_value = []
+        resp = client.get(INDUSTRIES_URL)
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+
+class TestGetIndustry:
+    """Test get industry by ID endpoint (cached 1 hour)."""
+    
+    @patch("app.routers.industries.snowflake")
+    def test_success(self, mock_sf, client):
+        """Test getting industry by ID."""
+        mock_sf.get_industry.return_value = _industry_row()
+        resp = client.get(f"{INDUSTRIES_URL}/{FAKE_INDUSTRY_ID}")
+        assert resp.status_code == 200
+        assert resp.json()["id"] == FAKE_INDUSTRY_ID
+        assert resp.json()["name"] == "Manufacturing"
+    
+    @patch("app.routers.industries.snowflake")
+    def test_not_found(self, mock_sf, client):
+        """Test 404 for non-existent industry."""
+        mock_sf.get_industry.side_effect = HTTPException(
+            status_code=404, detail="Industry not found"
+        )
+        resp = client.get(f"{INDUSTRIES_URL}/{FAKE_INDUSTRY_ID}")
+        assert resp.status_code == 404
+
+
+# ===========================================================================
+# Configuration Endpoints Tests
+# ===========================================================================
+
+CONFIG_URL = "/api/v1/config"
+
+
+class TestDimensionWeights:
+    """Test dimension weights configuration endpoint (cached 24 hours)."""
+    
+    def test_get_dimension_weights(self, client):
+        """Test getting dimension weights configuration."""
+        resp = client.get(f"{CONFIG_URL}/dimension-weights")
+        assert resp.status_code == 200
+        
+        body = resp.json()
+        assert "weights" in body
+        assert "total" in body
+        
+        # Verify all 7 dimensions present
+        weights = body["weights"]
+        assert len(weights) == 7
+        assert "data_infrastructure" in weights
+        assert "ai_governance" in weights
+        assert "technology_stack" in weights
+        assert "talent_skills" in weights
+        assert "leadership_vision" in weights
+        assert "use_case_portfolio" in weights
+        assert "culture_change" in weights
+        
+        # Verify weights per PDF Table 1
+        assert weights["data_infrastructure"] == 0.25
+        assert weights["ai_governance"] == 0.20
+        assert weights["technology_stack"] == 0.15
+        assert weights["talent_skills"] == 0.15
+        assert weights["leadership_vision"] == 0.10
+        assert weights["use_case_portfolio"] == 0.10
+        assert weights["culture_change"] == 0.05
+        
+        # Verify total sums to 1.0
+        assert body["total"] == 1.0
+    
+    def test_weights_sum_to_one(self, client):
+        """Test that all dimension weights sum to exactly 1.0."""
+        resp = client.get(f"{CONFIG_URL}/dimension-weights")
+        assert resp.status_code == 200
+        
+        weights = resp.json()["weights"]
+        total = sum(weights.values())
+        assert abs(total - 1.0) < 0.001  # Allow floating point precision
+
+
+# ===========================================================================
 # State Machine Tests
 # ===========================================================================
 

@@ -12,7 +12,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import settings
 from app.logging import setup_logging
-from app.routers import health, companies, assessments, scores
+from app.routers import health, companies, assessments, scores, industries, config
 
 # Setup logging
 setup_logging()
@@ -145,6 +145,8 @@ async def logging_middleware(request: Request, call_next):
 app.include_router(health.router)
 
 # API v1 routers
+app.include_router(config.router)  # Configuration data (dimension weights)
+app.include_router(industries.router)  # Industry reference data (cached)
 app.include_router(companies.router)
 app.include_router(assessments.router)
 app.include_router(scores.router)  # Individual dimension score updates
