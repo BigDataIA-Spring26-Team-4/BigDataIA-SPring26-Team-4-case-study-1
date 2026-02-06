@@ -16,7 +16,6 @@ from fastapi import HTTPException
 from app.models.company import CompanyCreate, CompanyUpdate
 from app.models.assessment import AssessmentCreate, AssessmentUpdate, VALID_TRANSITIONS, AssessmentStatus
 from app.models.dimension import DimensionScoreCreate, DimensionScoreUpdate
-from app.models.industry import IndustryCreate, IndustryUpdate
 
 log = structlog.get_logger(__name__)
 
@@ -68,16 +67,6 @@ async def check_snowflake() -> dict:
 # ORM models
 # ---------------------------------------------------------------------------
 
-class IndustryRow(Base):
-    __tablename__ = "industry"
-
-    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    name = Column(String(255), nullable=False)
-    sector = Column(String(255), nullable=False)
-    h_r_base = Column(Float, nullable=False)
-    created_at = Column(DateTime, default=func.current_timestamp())
-
-
 class CompanyRow(Base):
     __tablename__ = "company"
 
@@ -85,7 +74,7 @@ class CompanyRow(Base):
     name = Column(String(255), nullable=False)
     ticker = Column(String(10), nullable=True)
     industry_id = Column(String(36), ForeignKey("industry.id"), nullable=False)
-    position_factor = Column(Float, nullable=False, default=0.0)
+    position = Column(Float, nullable=False, default=0.0)
     created_at = Column(DateTime, default=func.current_timestamp())
     updated_at = Column(DateTime, default=func.current_timestamp(), onupdate=func.current_timestamp())
 
@@ -96,13 +85,13 @@ class AssessmentRow(Base):
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     company_id = Column(String(36), ForeignKey("company.id"), nullable=False)
     type = Column(String(50), nullable=False)
-    assessment_date = Column(DateTime, nullable=False)
-    status = Column(String(50), nullable=False, default="draft")
+    assessment_date = Column(Date, nullable=False)
+    status = Column(String(50), nullable=False, default="pending")
     vr_score = Column(Float, nullable=True)
-    confidence_lower = Column(Float, nullable=True)
-    confidence_upper = Column(Float, nullable=True)
-    primary_assessor = Column(String(255), nullable=True)
-    secondary_assessor = Column(String(255), nullable=True)
+    lower_bound = Column(Float, nullable=True)
+    upper_bound = Column(Float, nullable=True)
+    assessor_name = Column(String(255), nullable=True)
+    assessor_email = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=func.current_timestamp())
     updated_at = Column(DateTime, default=func.current_timestamp(), onupdate=func.current_timestamp())
 
@@ -114,8 +103,8 @@ class DimensionScoreRow(Base):
     assessment_id = Column(String(36), ForeignKey("assessment.id"), nullable=False)
     dimension = Column(String(50), nullable=False)
     score = Column(Float, nullable=False)
-    weight = Column(Float, nullable=True)
-    confidence = Column(Float, nullable=False, default=0.8)
+    weight = Column(Float, nullable=False)
+    confidence = Column(Float, nullable=False)
     evidence_count = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, default=func.current_timestamp())
     updated_at = Column(DateTime, default=func.current_timestamp(), onupdate=func.current_timestamp())
@@ -144,57 +133,6 @@ def paginate_query(query, page: int, page_size: int) -> tuple[list, int]:
 
 
 # ---------------------------------------------------------------------------
-# Industry CRUD
-# ---------------------------------------------------------------------------
-
-def create_industry(db: Session, data: IndustryCreate) -> IndustryRow:
-    log.info("db_create_industry", name=data.name)
-    row = IndustryRow(
-        name=data.name,
-        sector=data.sector,
-        h_r_base=data.h_r_base,
-    )
-    db.add(row)
-    db.commit()
-    db.refresh(row)
-    log.info("db_industry_created", industry_id=row.id)
-    return row
-
-
-def list_industries(db: Session, page: int = 1, page_size: int = 50) -> tuple[list[IndustryRow], int]:
-    log.debug("db_list_industries", page=page, page_size=page_size)
-    query = db.query(IndustryRow)
-    return paginate_query(query, page, page_size)
-
-
-def get_industry(db: Session, industry_id: str) -> IndustryRow:
-    log.debug("db_get_industry", industry_id=industry_id)
-    row = db.query(IndustryRow).filter(IndustryRow.id == industry_id).first()
-    if not row:
-        log.warning("industry_not_found", industry_id=industry_id)
-        raise HTTPException(status_code=404, detail="Industry not found")
-    return row
-
-
-def update_industry(db: Session, industry_id: str, data: IndustryUpdate) -> IndustryRow:
-    log.info("db_update_industry", industry_id=industry_id)
-    row = get_industry(db, industry_id)
-    updates = data.model_dump(exclude_unset=True)
-    for field, value in updates.items():
-        setattr(row, field, value)
-    db.commit()
-    db.refresh(row)
-    return row
-
-
-def delete_industry(db: Session, industry_id: str) -> None:
-    log.info("db_delete_industry", industry_id=industry_id)
-    row = get_industry(db, industry_id)
-    db.delete(row)
-    db.commit()
-
-
-# ---------------------------------------------------------------------------
 # Company CRUD
 # ---------------------------------------------------------------------------
 
@@ -204,7 +142,7 @@ def create_company(db: Session, data: CompanyCreate) -> CompanyRow:
         name=data.name,
         ticker=data.ticker,
         industry_id=str(data.industry_id),
-        position_factor=data.position_factor,
+        position=data.position,
     )
     db.add(row)
     db.commit()
@@ -260,10 +198,10 @@ def create_assessment(db: Session, data: AssessmentCreate) -> AssessmentRow:
         assessment_date=data.assessment_date,
         status=data.status.value,
         vr_score=data.vr_score,
-        confidence_lower=data.confidence_lower,
-        confidence_upper=data.confidence_upper,
-        primary_assessor=data.primary_assessor,
-        secondary_assessor=data.secondary_assessor,
+        lower_bound=data.lower_bound,
+        upper_bound=data.upper_bound,
+        assessor_name=data.assessor_name,
+        assessor_email=data.assessor_email,
     )
     db.add(row)
     db.commit()

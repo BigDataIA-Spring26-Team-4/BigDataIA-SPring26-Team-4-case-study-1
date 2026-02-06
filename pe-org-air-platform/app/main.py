@@ -4,7 +4,7 @@ import structlog
 from fastapi import FastAPI, Request, Response
 
 from app.logging import setup_logging
-from app.routers import health, companies, assessments
+from app.routers import health, companies, assessments, scores, industries
 
 setup_logging()
 log = structlog.get_logger(__name__)
@@ -20,8 +20,10 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 app.include_router(health.router)
+app.include_router(industries.router)
 app.include_router(companies.router)
 app.include_router(assessments.router)
+app.include_router(scores.router)
 
 
 @app.middleware("http")

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from uuid import UUID
 from datetime import datetime
@@ -6,9 +6,14 @@ from datetime import datetime
 
 class CompanyBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
-    ticker: Optional[str] = Field(None, pattern=r"^[A-Z]{1,10}$")
+    ticker: Optional[str] = Field(None, max_length=10)
     industry_id: UUID
-    position: float = Field(0.0, ge=-1.0, le=1.0)
+    position_factor: float = Field(0.0, ge=-1.0, le=1.0)
+
+    @field_validator('ticker')
+    @classmethod
+    def uppercase_ticker(cls, v: Optional[str]) -> Optional[str]:
+        return v.upper() if v else None
 
 
 class CompanyCreate(CompanyBase):
@@ -17,9 +22,14 @@ class CompanyCreate(CompanyBase):
 
 class CompanyUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
-    ticker: Optional[str] = Field(None, pattern=r"^[A-Z]{1,10}$")
+    ticker: Optional[str] = Field(None, max_length=10)
     industry_id: Optional[UUID] = None
-    position: Optional[float] = Field(None, ge=-1.0, le=1.0)
+    position_factor: Optional[float] = Field(None, ge=-1.0, le=1.0)
+
+    @field_validator('ticker')
+    @classmethod
+    def uppercase_ticker(cls, v: Optional[str]) -> Optional[str]:
+        return v.upper() if v else None
 
 
 class CompanyResponse(CompanyBase):

@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS industry (
     id VARCHAR(36) PRIMARY KEY DEFAULT UUID_STRING(),
     name VARCHAR(255) NOT NULL,
     h_r_base FLOAT NOT NULL,
-    sector VARCHAR(255) NOT NULL
+    sector VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
 );
 
 CREATE TABLE IF NOT EXISTS company (
@@ -31,7 +32,7 @@ CREATE TABLE IF NOT EXISTS company (
     name VARCHAR(255) NOT NULL,
     ticker VARCHAR(10),
     industry_id VARCHAR(36) NOT NULL,
-    position FLOAT NOT NULL DEFAULT 0.0,
+    position_factor FLOAT NOT NULL DEFAULT 0.0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
 
@@ -42,13 +43,13 @@ CREATE TABLE IF NOT EXISTS assessment (
     id VARCHAR(36) PRIMARY KEY DEFAULT UUID_STRING(),
     company_id VARCHAR(36) NOT NULL,
     type VARCHAR(50) NOT NULL,
-    assessment_date DATE NOT NULL,
-    status VARCHAR(50) NOT NULL DEFAULT 'pending',
+    assessment_date TIMESTAMP NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'draft',
     vr_score FLOAT,
-    lower_bound FLOAT,
-    upper_bound FLOAT,
-    assessor_name VARCHAR(255),
-    assessor_email VARCHAR(255),
+    confidence_lower FLOAT,
+    confidence_upper FLOAT,
+    primary_assessor VARCHAR(255),
+    secondary_assessor VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
 
@@ -60,11 +61,36 @@ CREATE TABLE IF NOT EXISTS dimension_score (
     assessment_id VARCHAR(36) NOT NULL,
     dimension VARCHAR(50) NOT NULL,
     score FLOAT NOT NULL,
-    weight FLOAT NOT NULL,
-    confidence FLOAT NOT NULL,
+    weight FLOAT,
+    confidence FLOAT NOT NULL DEFAULT 0.8,
     evidence_count INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
 
     FOREIGN KEY (assessment_id) REFERENCES assessment(id)
 );
+
+-- =========================================================================
+-- Indexes for performance
+-- =========================================================================
+
+CREATE INDEX IF NOT EXISTS idx_companies_industry
+ON company(industry_id);
+
+CREATE INDEX IF NOT EXISTS idx_assessments_company
+ON assessment(company_id);
+
+CREATE INDEX IF NOT EXISTS idx_dimension_scores_assessment
+ON dimension_score(assessment_id);
+
+-- =========================================================================
+-- Seed Data
+-- =========================================================================
+
+-- Insert industries
+INSERT INTO industry (id, name, sector, h_r_base) VALUES
+('550e8400-e29b-41d4-a716-446655440001', 'Manufacturing', 'Industrials', 72),
+('550e8400-e29b-41d4-a716-446655440002', 'Healthcare Services', 'Healthcare', 78),
+('550e8400-e29b-41d4-a716-446655440003', 'Business Services', 'Services', 75),
+('550e8400-e29b-41d4-a716-446655440004', 'Retail', 'Consumer', 70),
+('550e8400-e29b-41d4-a716-446655440005', 'Financial Services', 'Financial', 80);

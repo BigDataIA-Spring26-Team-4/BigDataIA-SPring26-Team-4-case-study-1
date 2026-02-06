@@ -36,7 +36,7 @@ def _company_row(**overrides):
         name="Acme Corp",
         ticker="ACME",
         industry_id=FAKE_INDUSTRY_ID,
-        position=0.5,
+        position_factor=0.5,
         created_at=NOW,
         updated_at=NOW,
     )
@@ -109,7 +109,7 @@ class TestCreateCompany:
             "name": "Acme Corp",
             "ticker": "ACME",
             "industry_id": FAKE_INDUSTRY_ID,
-            "position": 0.5,
+            "position_factor": 0.5,
         }
         resp = client.post(COMPANIES_URL, json=payload)
         assert resp.status_code == 200
@@ -123,7 +123,7 @@ class TestCreateCompany:
             "name": "Acme",
             "ticker": "bad",
             "industry_id": FAKE_INDUSTRY_ID,
-            "position": 0.0,
+            "position_factor": 0.0,
         }
         resp = client.post(COMPANIES_URL, json=payload)
         assert resp.status_code == 422
@@ -133,11 +133,11 @@ class TestCreateCompany:
         resp = client.post(COMPANIES_URL, json=payload)
         assert resp.status_code == 422
 
-    def test_position_out_of_range(self, client):
+    def test_position_factor_out_of_range(self, client):
         payload = {
             "name": "Acme",
             "industry_id": FAKE_INDUSTRY_ID,
-            "position": 5.0,
+            "position_factor": 5.0,
         }
         resp = client.post(COMPANIES_URL, json=payload)
         assert resp.status_code == 422

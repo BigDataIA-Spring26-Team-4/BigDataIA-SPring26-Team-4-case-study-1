@@ -10,6 +10,11 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /src
 
+# Install build dependencies needed for Python packages with C extensions
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends gcc build-essential && \
+    rm -rf /var/lib/apt/lists/*
+
 # Create a non-privileged user that the app will run under.
 ARG UID=10001
 RUN adduser \
