@@ -502,6 +502,21 @@ class TestPagination:
         assert body["page_size"] == 10
         assert body["total"] == 25
         assert body["total_pages"] == 3  # ceil(25/10) = 3
+    
+    @patch("app.routers.industries.snowflake")
+    def test_industries_pagination(self, mock_sf, client):
+        """Test industries pagination."""
+        # Create 10 mock industries
+        industries = [_industry_row(id=str(uuid.uuid4()), name=f"Industry {i}") for i in range(10)]
+        mock_sf.list_industries.return_value = industries
+        
+        # Test page 1
+        resp = client.get(f"{INDUSTRIES_URL}?page=1&page_size=5")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body["items"]) == 5
+        assert body["total"] == 10
+        assert body["total_pages"] == 2
 
 
 # ===========================================================================
@@ -526,12 +541,32 @@ def _industry_row(**overrides):
     return row
 
 
+class TestCreateIndustry:
+    """Test create industry endpoint."""
+    
+    @patch("app.routers.industries.snowflake")
+    @patch("app.routers.industries.invalidate")
+    def test_success(self, _inv, mock_sf, client):
+        """Test successful industry creation."""
+        mock_sf.create_industry.return_value = _industry_row()
+        payload = {
+            "name": "Manufacturing",
+            "sector": "Industrials",
+            "h_r_base": 72.0
+        }
+        resp = client.post(INDUSTRIES_URL, json=payload)
+        assert resp.status_code == 201
+        assert resp.json()["name"] == "Manufacturing"
+        mock_sf.create_industry.assert_called_once()
+        _inv.assert_called_once()  # Cache invalidated
+
+
 class TestListIndustries:
-    """Test industries list endpoint (cached 1 hour)."""
+    """Test industries list endpoint (cached 1 hour, paginated)."""
     
     @patch("app.routers.industries.snowflake")
     def test_success(self, mock_sf, client):
-        """Test listing industries with caching."""
+        """Test listing industries with pagination."""
         mock_sf.list_industries.return_value = [
             _industry_row(),
             _industry_row(id=str(uuid.uuid4()), name="Healthcare"),
@@ -539,8 +574,11 @@ class TestListIndustries:
         resp = client.get(INDUSTRIES_URL)
         assert resp.status_code == 200
         body = resp.json()
-        assert len(body) == 2
-        assert body[0]["name"] == "Manufacturing"
+        # Check pagination response
+        assert "items" in body
+        assert "total" in body
+        assert len(body["items"]) == 2
+        assert body["items"][0]["name"] == "Manufacturing"
     
     @patch("app.routers.industries.snowflake")
     def test_empty(self, mock_sf, client):
@@ -548,7 +586,9 @@ class TestListIndustries:
         mock_sf.list_industries.return_value = []
         resp = client.get(INDUSTRIES_URL)
         assert resp.status_code == 200
-        assert resp.json() == []
+        body = resp.json()
+        assert body["items"] == []
+        assert body["total"] == 0
 
 
 class TestGetIndustry:
@@ -570,6 +610,60 @@ class TestGetIndustry:
             status_code=404, detail="Industry not found"
         )
         resp = client.get(f"{INDUSTRIES_URL}/{FAKE_INDUSTRY_ID}")
+        assert resp.status_code == 404
+
+
+class TestUpdateIndustry:
+    """Test update industry endpoint."""
+    
+    @patch("app.routers.industries.snowflake")
+    @patch("app.routers.industries.invalidate")
+    def test_success(self, _inv, mock_sf, client):
+        """Test successful industry update."""
+        existing = _industry_row()
+        mock_sf.get_industry.return_value = existing
+        
+        payload = {
+            "name": "Updated Manufacturing",
+            "sector": "Industrials",
+            "h_r_base": 75.0
+        }
+        resp = client.put(f"{INDUSTRIES_URL}/{FAKE_INDUSTRY_ID}", json=payload)
+        assert resp.status_code == 200
+        _inv.assert_called_once()  # Cache invalidated
+    
+    @patch("app.routers.industries.snowflake")
+    @patch("app.routers.industries.invalidate")
+    def test_not_found(self, _inv, mock_sf, client):
+        """Test 404 for updating non-existent industry."""
+        mock_sf.get_industry.side_effect = HTTPException(
+            status_code=404, detail="Industry not found"
+        )
+        payload = {"name": "Test", "sector": "Test", "h_r_base": 50.0}
+        resp = client.put(f"{INDUSTRIES_URL}/{FAKE_INDUSTRY_ID}", json=payload)
+        assert resp.status_code == 404
+
+
+class TestDeleteIndustry:
+    """Test delete industry endpoint."""
+    
+    @patch("app.routers.industries.snowflake")
+    @patch("app.routers.industries.invalidate")
+    def test_success(self, _inv, mock_sf, client):
+        """Test successful industry deletion."""
+        mock_sf.get_industry.return_value = _industry_row()
+        resp = client.delete(f"{INDUSTRIES_URL}/{FAKE_INDUSTRY_ID}")
+        assert resp.status_code == 204  # No Content
+        _inv.assert_called_once()  # Cache invalidated
+    
+    @patch("app.routers.industries.snowflake")
+    @patch("app.routers.industries.invalidate")
+    def test_not_found(self, _inv, mock_sf, client):
+        """Test 404 for deleting non-existent industry."""
+        mock_sf.get_industry.side_effect = HTTPException(
+            status_code=404, detail="Industry not found"
+        )
+        resp = client.delete(f"{INDUSTRIES_URL}/{FAKE_INDUSTRY_ID}")
         assert resp.status_code == 404
 
 

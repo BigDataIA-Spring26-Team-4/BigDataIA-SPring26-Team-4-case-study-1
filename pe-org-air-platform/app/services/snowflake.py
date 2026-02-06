@@ -47,7 +47,7 @@ log = structlog.get_logger(__name__)
 # Build connection string with URL-encoded credentials
 connection_string = (
     f"snowflake://{quote_plus(settings.SNOWFLAKE_USER)}:"
-    f"{quote_plus(settings.SNOWFLAKE_PASSWORD)}@"
+    f"{quote_plus(settings.SNOWFLAKE_PASSWORD.get_secret_value())}@"
     f"{settings.SNOWFLAKE_ACCOUNT}/"
     f"{settings.SNOWFLAKE_DATABASE}/"
     f"{settings.SNOWFLAKE_SCHEMA}"

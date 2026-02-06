@@ -49,7 +49,7 @@ def get_redis_client() -> Optional[redis.Redis]:
                 host=settings.REDIS_HOST,
                 port=settings.REDIS_PORT,
                 db=settings.REDIS_DB,
-                password=settings.REDIS_PASSWORD,
+                password=settings.REDIS_PASSWORD.get_secret_value() if settings.REDIS_PASSWORD else None,
                 decode_responses=True,  # Automatically decode bytes to str
                 socket_connect_timeout=5,
                 socket_timeout=5,

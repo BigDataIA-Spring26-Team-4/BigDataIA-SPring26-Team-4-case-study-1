@@ -33,9 +33,10 @@ def test_connection():
     
     print(f"\n🔗 Connection String:")
     # Build the same connection string as the service (with URL encoding)
+    password_value = settings.SNOWFLAKE_PASSWORD.get_secret_value()
     conn_str = (
         f"snowflake://{quote_plus(settings.SNOWFLAKE_USER)}:"
-        f"{quote_plus(settings.SNOWFLAKE_PASSWORD)}@"
+        f"{quote_plus(password_value)}@"
         f"{settings.SNOWFLAKE_ACCOUNT}/"
         f"{settings.SNOWFLAKE_DATABASE}/"
         f"{settings.SNOWFLAKE_SCHEMA}"
@@ -45,7 +46,7 @@ def test_connection():
         conn_str += f"&role={settings.SNOWFLAKE_ROLE}"
     
     # Print connection string with password masked
-    safe_conn_str = conn_str.replace(quote_plus(settings.SNOWFLAKE_PASSWORD), "***")
+    safe_conn_str = conn_str.replace(quote_plus(password_value), "***")
     print(f"   {safe_conn_str}")
     print(f"   (Password special characters are URL-encoded)")
     

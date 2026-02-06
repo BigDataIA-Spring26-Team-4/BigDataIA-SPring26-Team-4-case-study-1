@@ -7,7 +7,7 @@ if required settings are missing or invalid.
 """
 
 from typing import Optional
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -42,9 +42,9 @@ class Settings(BaseSettings):
         ...,
         description="Snowflake username"
     )
-    SNOWFLAKE_PASSWORD: str = Field(
+    SNOWFLAKE_PASSWORD: SecretStr = Field(
         ...,
-        description="Snowflake password"
+        description="Snowflake password (secured, not logged)"
     )
     SNOWFLAKE_DATABASE: str = Field(
         default="PE_ORG_AIR_DB",
@@ -82,9 +82,9 @@ class Settings(BaseSettings):
         le=15,
         description="Redis database number (0-15)"
     )
-    REDIS_PASSWORD: Optional[str] = Field(
+    REDIS_PASSWORD: Optional[SecretStr] = Field(
         default=None,
-        description="Redis password (if authentication is enabled)"
+        description="Redis password (if authentication is enabled, secured)"
     )
     REDIS_ENABLED: bool = Field(
         default=True,
