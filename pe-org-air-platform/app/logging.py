@@ -1,10 +1,12 @@
 import logging
-import os
 import structlog
+
+from app.config import get_settings
 
 
 def setup_logging() -> None:
-    log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+    settings = get_settings()
+    log_level = settings.LOG_LEVEL
 
     structlog.configure(
         processors=[
@@ -26,7 +28,7 @@ def setup_logging() -> None:
 
     formatter = structlog.stdlib.ProcessorFormatter(
         processor=structlog.dev.ConsoleRenderer()
-        if os.getenv("LOG_FORMAT", "console") == "console"
+        if settings.LOG_FORMAT == "console"
         else structlog.processors.JSONRenderer(),
     )
 

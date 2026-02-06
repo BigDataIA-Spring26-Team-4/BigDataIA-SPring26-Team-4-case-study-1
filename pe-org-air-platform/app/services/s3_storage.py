@@ -1,4 +1,3 @@
-import os
 from typing import Optional, Dict, List
 
 import boto3
@@ -6,13 +5,12 @@ import aioboto3
 from botocore.exceptions import ClientError
 import structlog
 
+from app.config import get_settings
+
 log = structlog.get_logger(__name__)
 
-# S3 configuration from environment variables
-AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
-AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
-AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
-S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
+# Load settings
+settings = get_settings()
 
 # Global S3 clients (initialized lazily)
 _s3_client: Optional[boto3.client] = None
@@ -25,11 +23,11 @@ def get_s3_client():
     if _s3_client is None:
         _s3_client = boto3.client(
             's3',
-            aws_access_key_id=AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-            region_name=AWS_REGION
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID.get_secret_value(),
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY.get_secret_value(),
+            region_name=settings.AWS_REGION
         )
-        log.info("s3_client_initialized", region=AWS_REGION, bucket=S3_BUCKET_NAME)
+        log.info("s3_client_initialized", region=settings.AWS_REGION, bucket=settings.settings.S3_BUCKET_NAME)
     return _s3_client
 
 
@@ -38,11 +36,11 @@ def get_async_s3_session():
     global _async_s3_session
     if _async_s3_session is None:
         _async_s3_session = aioboto3.Session(
-            aws_access_key_id=AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-            region_name=AWS_REGION
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID.get_secret_value(),
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY.get_secret_value(),
+            region_name=settings.AWS_REGION
         )
-        log.info("async_s3_session_initialized", region=AWS_REGION, bucket=S3_BUCKET_NAME)
+        log.info("async_s3_session_initialized", region=settings.AWS_REGION, bucket=settings.settings.S3_BUCKET_NAME)
     return _async_s3_session
 
 
@@ -64,17 +62,17 @@ def upload_document(file_data: bytes, key: str, metadata: Optional[Dict[str, str
             extra_args['Metadata'] = metadata
 
         client.put_object(
-            Bucket=S3_BUCKET_NAME,
+            Bucket=settings.S3_BUCKET_NAME,
             Key=key,
             Body=file_data,
             **extra_args
         )
 
-        log.info("document_uploaded", key=key, bucket=S3_BUCKET_NAME, size=len(file_data))
+        log.info("document_uploaded", key=key, bucket=settings.S3_BUCKET_NAME, size=len(file_data))
         return {
             "status": "success",
             "key": key,
-            "bucket": S3_BUCKET_NAME,
+            "bucket": settings.S3_BUCKET_NAME,
             "size": len(file_data)
         }
     except ClientError as e:
@@ -101,17 +99,17 @@ async def upload_document_async(file_data: bytes, key: str, metadata: Optional[D
                 extra_args['Metadata'] = metadata
 
             await client.put_object(
-                Bucket=S3_BUCKET_NAME,
+                Bucket=settings.S3_BUCKET_NAME,
                 Key=key,
                 Body=file_data,
                 **extra_args
             )
 
-        log.info("document_uploaded_async", key=key, bucket=S3_BUCKET_NAME, size=len(file_data))
+        log.info("document_uploaded_async", key=key, bucket=settings.S3_BUCKET_NAME, size=len(file_data))
         return {
             "status": "success",
             "key": key,
-            "bucket": S3_BUCKET_NAME,
+            "bucket": settings.S3_BUCKET_NAME,
             "size": len(file_data)
         }
     except ClientError as e:
@@ -130,14 +128,14 @@ def download_document(key: str) -> Optional[bytes]:
     """
     try:
         client = get_s3_client()
-        response = client.get_object(Bucket=S3_BUCKET_NAME, Key=key)
+        response = client.get_object(Bucket=settings.S3_BUCKET_NAME, Key=key)
         content = response['Body'].read()
 
-        log.info("document_downloaded", key=key, bucket=S3_BUCKET_NAME, size=len(content))
+        log.info("document_downloaded", key=key, bucket=settings.S3_BUCKET_NAME, size=len(content))
         return content
     except ClientError as e:
         if e.response['Error']['Code'] == 'NoSuchKey':
-            log.warning("document_not_found", key=key, bucket=S3_BUCKET_NAME)
+            log.warning("document_not_found", key=key, bucket=settings.S3_BUCKET_NAME)
         else:
             log.error("document_download_error", key=key, error=str(e))
         return None
@@ -155,15 +153,15 @@ async def download_document_async(key: str) -> Optional[bytes]:
     try:
         session = get_async_s3_session()
         async with session.client('s3') as client:
-            response = await client.get_object(Bucket=S3_BUCKET_NAME, Key=key)
+            response = await client.get_object(Bucket=settings.S3_BUCKET_NAME, Key=key)
             async with response['Body'] as stream:
                 content = await stream.read()
 
-        log.info("document_downloaded_async", key=key, bucket=S3_BUCKET_NAME, size=len(content))
+        log.info("document_downloaded_async", key=key, bucket=settings.S3_BUCKET_NAME, size=len(content))
         return content
     except ClientError as e:
         if e.response['Error']['Code'] == 'NoSuchKey':
-            log.warning("document_not_found_async", key=key, bucket=S3_BUCKET_NAME)
+            log.warning("document_not_found_async", key=key, bucket=settings.S3_BUCKET_NAME)
         else:
             log.error("document_download_error_async", key=key, error=str(e))
         return None
@@ -180,9 +178,9 @@ def delete_document(key: str) -> Dict[str, str]:
     """
     try:
         client = get_s3_client()
-        client.delete_object(Bucket=S3_BUCKET_NAME, Key=key)
+        client.delete_object(Bucket=settings.S3_BUCKET_NAME, Key=key)
 
-        log.info("document_deleted", key=key, bucket=S3_BUCKET_NAME)
+        log.info("document_deleted", key=key, bucket=settings.S3_BUCKET_NAME)
         return {"status": "success", "key": key}
     except ClientError as e:
         log.error("document_delete_error", key=key, error=str(e))
@@ -201,9 +199,9 @@ async def delete_document_async(key: str) -> Dict[str, str]:
     try:
         session = get_async_s3_session()
         async with session.client('s3') as client:
-            await client.delete_object(Bucket=S3_BUCKET_NAME, Key=key)
+            await client.delete_object(Bucket=settings.S3_BUCKET_NAME, Key=key)
 
-        log.info("document_deleted_async", key=key, bucket=S3_BUCKET_NAME)
+        log.info("document_deleted_async", key=key, bucket=settings.S3_BUCKET_NAME)
         return {"status": "success", "key": key}
     except ClientError as e:
         log.error("document_delete_error_async", key=key, error=str(e))
@@ -223,7 +221,7 @@ def list_documents(prefix: str = "", max_keys: int = 1000) -> List[Dict[str, any
     try:
         client = get_s3_client()
         response = client.list_objects_v2(
-            Bucket=S3_BUCKET_NAME,
+            Bucket=settings.S3_BUCKET_NAME,
             Prefix=prefix,
             MaxKeys=max_keys
         )
@@ -258,7 +256,7 @@ async def list_documents_async(prefix: str = "", max_keys: int = 1000) -> List[D
         session = get_async_s3_session()
         async with session.client('s3') as client:
             response = await client.list_objects_v2(
-                Bucket=S3_BUCKET_NAME,
+                Bucket=settings.S3_BUCKET_NAME,
                 Prefix=prefix,
                 MaxKeys=max_keys
             )
@@ -290,7 +288,7 @@ def get_document_metadata(key: str) -> Optional[Dict[str, any]]:
     """
     try:
         client = get_s3_client()
-        response = client.head_object(Bucket=S3_BUCKET_NAME, Key=key)
+        response = client.head_object(Bucket=settings.S3_BUCKET_NAME, Key=key)
 
         metadata = {
             'key': key,
@@ -322,7 +320,7 @@ async def get_document_metadata_async(key: str) -> Optional[Dict[str, any]]:
     try:
         session = get_async_s3_session()
         async with session.client('s3') as client:
-            response = await client.head_object(Bucket=S3_BUCKET_NAME, Key=key)
+            response = await client.head_object(Bucket=settings.S3_BUCKET_NAME, Key=key)
 
         metadata = {
             'key': key,
@@ -348,13 +346,13 @@ async def check_s3() -> dict:
         session = get_async_s3_session()
         async with session.client('s3') as client:
             # Try to head the bucket to verify access
-            await client.head_bucket(Bucket=S3_BUCKET_NAME)
+            await client.head_bucket(Bucket=settings.S3_BUCKET_NAME)
 
-        log.debug("s3_health_check_ok", bucket=S3_BUCKET_NAME)
-        return {"status": "ok", "bucket": S3_BUCKET_NAME, "error": None}
+        log.debug("s3_health_check_ok", bucket=settings.S3_BUCKET_NAME)
+        return {"status": "ok", "bucket": settings.S3_BUCKET_NAME, "error": None}
     except ClientError as e:
-        log.error("s3_health_check_error", bucket=S3_BUCKET_NAME, error=str(e))
-        return {"status": "error", "bucket": S3_BUCKET_NAME, "error": str(e)}
+        log.error("s3_health_check_error", bucket=settings.S3_BUCKET_NAME, error=str(e))
+        return {"status": "error", "bucket": settings.S3_BUCKET_NAME, "error": str(e)}
     except Exception as e:
         log.error("s3_health_check_unexpected_error", error=str(e))
         return {"status": "error", "error": str(e)}
