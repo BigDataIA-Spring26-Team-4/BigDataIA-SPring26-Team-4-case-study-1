@@ -6,7 +6,7 @@
 
 ## 🔗 Project Links
 
-- **Codelabs Documentation**: _[Insert Your Codelabs URL Here]_
+- **Codelabs Documentation**: https://codelabs-preview.appspot.com/?file_id=1gWQbNSjFmc7EzAxUR_S1er1Ca3GuVudQpuJXG1aqY30
 - **Video Presentation**: _[Insert Video Link Here]_
 - **Live Application**: _[Insert Streamlit/FastAPI URL Here]_
 
