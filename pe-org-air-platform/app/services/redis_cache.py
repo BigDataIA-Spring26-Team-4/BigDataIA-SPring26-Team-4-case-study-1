@@ -3,22 +3,18 @@ import json
 import asyncio
 import functools
 import pickle
-import os
 from typing import Optional
 
 import redis.asyncio as aioredis
 import redis
 import structlog
 
+from app.config import get_settings
+
 log = structlog.get_logger(__name__)
 
-# Redis configuration from environment variables
-REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
-REDIS_USERNAME = os.getenv("REDIS_USERNAME", None)
-REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
-REDIS_DB = int(os.getenv("REDIS_DB", "0"))
-REDIS_TTL = int(os.getenv("REDIS_TTL", "3600"))
+# Load settings
+settings = get_settings()
 
 # Global Redis clients (initialized lazily)
 _redis_client: Optional[redis.Redis] = None
@@ -30,14 +26,14 @@ def get_redis_client() -> redis.Redis:
     global _redis_client
     if _redis_client is None:
         _redis_client = redis.Redis(
-            host=REDIS_HOST,
-            port=REDIS_PORT,
-            username=REDIS_USERNAME,
-            password=REDIS_PASSWORD,
-            db=REDIS_DB,
+            host=settings.REDIS_HOST,
+            port=settings.REDIS_PORT,
+            username=settings.REDIS_USERNAME,
+            password=settings.REDIS_PASSWORD.get_secret_value() if settings.REDIS_PASSWORD else None,
+            db=settings.REDIS_DB,
             decode_responses=False,  # We handle binary data for pickle
         )
-        log.info("redis_client_initialized", host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB)
+        log.info("redis_client_initialized", host=settings.REDIS_HOST, port=settings.REDIS_PORT, db=settings.REDIS_DB)
     return _redis_client
 
 
@@ -46,14 +42,14 @@ async def get_async_redis_client() -> aioredis.Redis:
     global _async_redis_client
     if _async_redis_client is None:
         _async_redis_client = aioredis.Redis(
-            host=REDIS_HOST,
-            port=REDIS_PORT,
-            username=REDIS_USERNAME,
-            password=REDIS_PASSWORD,
-            db=REDIS_DB,
+            host=settings.REDIS_HOST,
+            port=settings.REDIS_PORT,
+            username=settings.REDIS_USERNAME,
+            password=settings.REDIS_PASSWORD.get_secret_value() if settings.REDIS_PASSWORD else None,
+            db=settings.REDIS_DB,
             decode_responses=False,  # We handle binary data for pickle
         )
-        log.info("async_redis_client_initialized", host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB)
+        log.info("async_redis_client_initialized", host=settings.REDIS_HOST, port=settings.REDIS_PORT, db=settings.REDIS_DB)
     return _async_redis_client
 
 
@@ -71,10 +67,10 @@ def cached(prefix: str = "", exclude: list[str] | None = None, ttl: int | None =
     Args:
         prefix: Cache key prefix
         exclude: List of parameter names to exclude from cache key (e.g., ['db'])
-        ttl: Time-to-live in seconds (defaults to REDIS_TTL from environment)
+        ttl: Time-to-live in seconds (defaults to settings.REDIS_TTL)
     """
     exclude_keys = set(exclude or [])
-    cache_ttl = ttl if ttl is not None else REDIS_TTL
+    cache_ttl = ttl if ttl is not None else settings.REDIS_TTL
 
     def decorator(fn):
         if asyncio.iscoroutinefunction(fn):

@@ -1,11 +1,7 @@
-import os
 import uuid
 from datetime import datetime, date
 
 import structlog
-from dotenv import load_dotenv
-load_dotenv()
-
 from sqlalchemy import (
     create_engine, Column, String, Float, Date, DateTime, Integer,
     ForeignKey, func,
@@ -13,6 +9,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from fastapi import HTTPException
 
+from app.config import get_settings
 from app.models.company import CompanyCreate, CompanyUpdate
 from app.models.assessment import AssessmentCreate, AssessmentUpdate, VALID_TRANSITIONS, AssessmentStatus
 from app.models.dimension import DimensionScoreCreate, DimensionScoreUpdate
@@ -24,19 +21,8 @@ log = structlog.get_logger(__name__)
 # Engine & session
 # ---------------------------------------------------------------------------
 
-SNOWFLAKE_URL = os.getenv(
-    "SNOWFLAKE_URL",
-    "snowflake://{user}:{password}@{account}/{database}/{schema}?warehouse={warehouse}".format(
-        user=os.getenv("SNOWFLAKE_USER", ""),
-        password=os.getenv("SNOWFLAKE_PASSWORD", ""),
-        account=os.getenv("SNOWFLAKE_ACCOUNT", ""),
-        database=os.getenv("SNOWFLAKE_DATABASE", ""),
-        schema=os.getenv("SNOWFLAKE_SCHEMA", ""),
-        warehouse=os.getenv("SNOWFLAKE_WAREHOUSE", ""),
-    ),
-)
-
-engine = create_engine(SNOWFLAKE_URL)
+settings = get_settings()
+engine = create_engine(settings.snowflake_url)
 SessionLocal = sessionmaker(bind=engine)
 
 Base = declarative_base()
