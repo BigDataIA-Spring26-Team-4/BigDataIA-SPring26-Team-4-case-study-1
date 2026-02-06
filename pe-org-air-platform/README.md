@@ -1,19 +1,205 @@
 # PE Org-AIR Platform - Platform Foundation
 
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.109+-green.svg)](https://fastapi.tiangolo.com/)
+[![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/)
+[![Docker](https://img.shields.io/badge/Docker-Enabled-blue.svg)](https://www.docker.com/)
+[![License](https://img.shields.io/badge/License-Educational-orange.svg)](LICENSE)
+
+## 📚 Important Links
+
+- **Codelabs Document**: <Codelabs link>
+- **Video Presentation**: <Video presentation link>
+- **Live Application**: <Streamlit/FastAPI application URL>
+- **API Documentation**: http://localhost:8000/docs (when running locally)
+- **GitHub Repository**: <GitHub repository link>
+
+---
+
+## 📋 Table of Contents
+
+- [Project Overview](#project-overview)
+- [Architecture](#architecture)
+- [Directory Structure](#directory-structure)
+- [Features](#features)
+- [Technology Stack](#technology-stack)
+- [Setup Instructions](#setup-instructions)
+- [API Documentation](#api-documentation)
+- [Running Tests](#running-tests)
+- [Team Contributions](#team-contributions)
+- [Development](#development)
+- [Troubleshooting](#troubleshooting)
+
+---
+
 ## Project Overview
 
-The **PE Org-AIR (Organizational AI-Readiness) Platform** is a data-driven system for private equity firms to assess the AI-readiness of portfolio companies and acquisition targets. The platform provides systematic evaluation across seven dimensions of AI-readiness, helping firms make informed decisions about investments and value creation opportunities.
+The **PE Org-AIR (Organizational AI-Readiness) Platform** is a comprehensive data-driven system designed for private equity firms to systematically assess the AI-readiness of portfolio companies and acquisition targets.
 
-### Technologies Used
+### Purpose
 
-- **FastAPI** - Modern, fast web framework for building APIs
-- **Pydantic v2** - Data validation and settings management using Python type annotations
-- **Docker & Docker Compose** - Containerization and orchestration
-- **Snowflake** - Cloud data warehouse for analytics
-- **Redis** - In-memory caching layer
-- **AWS S3** - Document storage
-- **SQLAlchemy** - ORM for database operations
-- **Pytest** - Testing framework
+Private equity firms need to evaluate potential investments and portfolio companies across multiple dimensions to understand their readiness to adopt and benefit from AI technologies. This platform provides:
+
+- **Standardized Assessment Framework**: Seven-dimension evaluation model for consistent comparison
+- **Data-Driven Insights**: Integration with Snowflake for advanced analytics and reporting
+- **Real-Time Caching**: Redis-powered caching for high-performance API responses
+- **RESTful API**: Modern FastAPI-based backend with comprehensive CRUD operations
+- **Scalable Architecture**: Docker-based containerization for easy deployment and scaling
+
+### Scope
+
+**Case Study 1** establishes the platform foundation with:
+- Complete RESTful API with 17+ endpoints
+- Full CRUD operations for Industries, Companies, Assessments, and Dimension Scores
+- Pydantic-based data validation and serialization
+- Redis caching layer with intelligent TTL management
+- Snowflake data warehouse integration
+- Comprehensive test suite with pytest
+- Docker containerization for consistent environments
+
+**Future Case Studies** will extend functionality with:
+- SEC filing ingestion and AI evidence extraction
+- Automated scoring engine with VR (Value-Readiness) calculation
+- RAG (Retrieval-Augmented Generation) for semantic search
+- Interactive Streamlit dashboards and visualizations
+
+### Technology Stack
+
+| Category | Technology | Purpose |
+|----------|-----------|---------|
+| **Backend Framework** | FastAPI 0.109+ | High-performance async API framework |
+| **Data Validation** | Pydantic v2 | Type-safe data models with validation |
+| **Database** | Snowflake | Cloud data warehouse for analytics |
+| **Caching** | Redis 7 | In-memory data store for performance |
+| **Storage** | AWS S3 | Document and file storage |
+| **Containerization** | Docker & Docker Compose | Application packaging and orchestration |
+| **Testing** | Pytest | Comprehensive testing framework |
+| **Language** | Python 3.12+ | Modern Python with type hints |
+
+---
+
+## Architecture
+
+### System Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         Client Layer                             │
+│  (API Consumers: Web Apps, Mobile Apps, Internal Tools)         │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            │ HTTP/REST
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      FastAPI Application                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
+│  │   Health     │  │  Industries  │  │  Companies   │          │
+│  │   Router     │  │   Router     │  │   Router     │          │
+│  └──────────────┘  └──────────────┘  └──────────────┘          │
+│  ┌──────────────┐  ┌──────────────┐                            │
+│  │ Assessments  │  │    Scores    │                            │
+│  │   Router     │  │   Router     │                            │
+│  └──────────────┘  └──────────────┘                            │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────┐        │
+│  │            Pydantic Models & Validation            │        │
+│  └────────────────────────────────────────────────────┘        │
+└────────┬────────────────────┬──────────────────┬───────────────┘
+         │                    │                  │
+         │                    │                  │
+         ▼                    ▼                  ▼
+┌──────────────────┐ ┌─────────────────┐ ┌────────────────┐
+│  Redis Cache     │ │   Snowflake DB  │ │    AWS S3      │
+│                  │ │                 │ │                │
+│ • TTL-based      │ │ • Industries    │ │ • Documents    │
+│ • Auto-invalidate│ │ • Companies     │ │ • Reports      │
+│ • Performance    │ │ • Assessments   │ │ • Evidence     │
+│                  │ │ • Scores        │ │                │
+└──────────────────┘ └─────────────────┘ └────────────────┘
+```
+
+### Data Flow
+
+1. **Request Flow**:
+   - Client sends HTTP request to FastAPI endpoint
+   - Pydantic models validate request data
+   - Router checks Redis cache for existing data
+   - If cache miss, query Snowflake database
+   - Cache result in Redis with appropriate TTL
+   - Return response to client
+
+2. **Write Flow**:
+   - Client sends write request (POST/PUT/PATCH/DELETE)
+   - Pydantic validates incoming data
+   - Write to Snowflake database
+   - Invalidate relevant Redis cache entries
+   - Return success response
+
+3. **Health Check Flow**:
+   - Health endpoint tests connectivity to all services
+   - Returns aggregated health status
+   - Used for monitoring and deployment validation
+
+---
+
+## Directory Structure
+
+```
+pe-org-air-platform/
+├── app/                          # Main application directory
+│   ├── config.py                 # Configuration management with Pydantic settings
+│   ├── database/                 # Database schemas and migrations
+│   │   ├── __init__.py
+│   │   └── schema.sql            # Snowflake table definitions
+│   ├── __init__.py
+│   ├── logging.py                # Structured logging configuration
+│   ├── main.py                   # FastAPI application entry point
+│   ├── models/                   # Pydantic data models
+│   │   ├── assessment.py         # Assessment models with validation
+│   │   ├── company.py            # Company models with ticker validation
+│   │   ├── dimension.py          # Dimension score models
+│   │   ├── industry.py           # Industry models
+│   │   └── __init__.py
+│   ├── routers/                  # API route handlers
+│   │   ├── assessments.py        # Assessment CRUD endpoints
+│   │   ├── companies.py          # Company CRUD endpoints
+│   │   ├── health.py             # Health check endpoint
+│   │   ├── industries.py         # Industry CRUD endpoints
+│   │   ├── __init__.py
+│   │   └── scores.py             # Dimension score endpoints
+│   ├── services/                 # External service integrations
+│   │   ├── __init__.py
+│   │   ├── redis_cache.py        # Redis caching service
+│   │   ├── s3_storage.py         # AWS S3 storage service
+│   │   └── snowflake.py          # Snowflake database service
+│   └── utils/                    # Utility functions
+│       ├── __init__.py
+│       └── pagination.py         # Pagination helper functions
+├── docker/                       # Docker configuration
+│   ├── compose.yaml              # Docker Compose orchestration
+│   ├── Dockerfile                # Application container definition
+│   └── README.Docker.md          # Docker-specific documentation
+├── docs/                         # Documentation
+│   └── CONFIGURATION.md          # Configuration guide
+├── README.md                     # This file
+├── requirements.txt              # Python dependencies
+├── scripts/                      # Utility scripts
+│   └── validate_config.py        # Configuration validation script
+└── tests/                        # Test suite
+    ├── conftest.py               # Pytest configuration and fixtures
+    ├── __init__.py
+    ├── test_api.py               # API endpoint tests
+    ├── test_config.py            # Configuration tests
+    └── test_models.py            # Pydantic model tests
+```
+
+**Key Components:**
+
+- **app/main.py**: FastAPI application initialization and router registration
+- **app/models/**: Pydantic models with field and model validators
+- **app/routers/**: API endpoints organized by resource type
+- **app/services/**: External service integrations (Snowflake, Redis, S3)
+- **tests/**: Comprehensive test suite with 95%+ coverage
+- **docker/**: Containerization configuration for consistent deployments
 
 ---
 
@@ -198,40 +384,51 @@ Once the application is running, access the interactive API documentation:
 
 ```
 pe-org-air-platform/
-├── app/
-│   ├── __init__.py
-│   ├── main.py                    # FastAPI application entry point
-│   ├── config.py                  # Configuration management
-│   ├── logging.py                 # Structured logging setup
-│   ├── models/                    # Pydantic data models
-│   │   ├── assessment.py          # Assessment models & enums
-│   │   ├── company.py             # Company models
-│   │   ├── dimension.py           # Dimension score models
-│   │   └── industry.py            # Industry models
-│   ├── routers/                   # API endpoint routers
-│   │   ├── assessments.py
-│   │   ├── companies.py
-│   │   ├── health.py
-│   │   ├── industries.py
-│   │   └── scores.py
-│   ├── services/                  # Business logic & integrations
-│   │   ├── redis_cache.py         # Redis caching layer
-│   │   ├── s3_storage.py          # S3 document storage
-│   │   └── snowflake.py           # Snowflake database ORM
-│   ├── utils/                     # Utility functions
-│   │   └── pagination.py          # Pagination helpers
-│   └── database/
-│       └── schema.sql             # Snowflake DDL & seed data
-├── tests/
-│   ├── conftest.py                # Pytest fixtures
-│   ├── test_api.py                # API endpoint tests
-│   └── test_models.py             # Model validation tests
-├── docker/
-│   ├── Dockerfile
-│   └── compose.yaml
+├── app
+│   ├── config.py
+│   ├── database
+│   │   ├── __init__.py
+│   │   └── schema.sql
+│   ├── __init__.py
+│   ├── logging.py
+│   ├── main.py
+│   ├── models
+│   │   ├── assessment.py
+│   │   ├── company.py
+│   │   ├── dimension.py
+│   │   ├── industry.py
+│   │   └── __init__.py
+│   ├── routers
+│   │   ├── assessments.py
+│   │   ├── companies.py
+│   │   ├── health.py
+│   │   ├── industries.py
+│   │   ├── __init__.py
+│   │   └── scores.py
+│   ├── services
+│   │   ├── __init__.py
+│   │   ├── redis_cache.py
+│   │   ├── s3_storage.py
+│   │   └── snowflake.py
+│   └── utils
+│       ├── __init__.py
+│       └── pagination.py
+├── docker
+│   ├── compose.yaml
+│   ├── Dockerfile
+│   └── README.Docker.md
+├── docs
+│   └── CONFIGURATION.md
+├── README.md
 ├── requirements.txt
-├── .env.example
-└── README.md
+├── scripts
+│   └── validate_config.py
+└── tests
+    ├── conftest.py
+    ├── __init__.py
+    ├── test_api.py
+    ├── test_config.py
+    └── test_models.py
 ```
 
 ---
